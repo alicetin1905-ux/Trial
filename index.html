@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1720">
+<title>Trial · strategy tester</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0F1720; --panel:#16212D; --panel2:#1B2937; --line:#263749;
+  --text:#E7ECF2; --muted:#8B9BAD; --amber:#F0B54A; --teal:#46C2B0; --coral:#E8644F; --slate:#6F8398;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%}
+.wrap{max-width:880px;margin:0 auto;padding:18px 14px 60px}
+h1{font-size:30px;font-weight:800;margin:0;letter-spacing:-.02em}
+h1 span{color:var(--amber)}
+.sub{color:var(--muted);margin:2px 0 18px}
+details{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+summary{cursor:pointer;list-style:none;padding:13px 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary small{color:var(--muted);font-weight:400}
+.body{padding:0 14px 14px}
+.row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.row.c3{grid-template-columns:repeat(3,1fr)}.row.c4{grid-template-columns:repeat(4,1fr)}}
+label{display:block;color:var(--muted);font-size:13px;margin-bottom:4px}
+input,select,button{font:inherit;color:var(--text)}
+input,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:40px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer;min-height:36px}
+.pill[aria-pressed=true]{background:var(--amber);border-color:var(--amber);color:#1a1405;font-weight:600}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:11px 16px;cursor:pointer;font-weight:600;min-height:44px}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:#1a1405}
+.btn.small{padding:6px 10px;min-height:32px;font-weight:500;font-size:13px}
+.hint{color:var(--muted);font-size:13px;margin:8px 0 0}
+.status{min-height:22px;color:var(--muted);margin:6px 2px}
+.status.err{color:var(--coral)}
+.hero{padding:16px 14px 6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:6px}
+.hero .big{font-size:46px;font-weight:800;letter-spacing:-.03em;line-height:1.05}
+.hero .big.pos{color:var(--teal)} .hero .big.neg{color:var(--coral)}
+.hero .meta{color:var(--muted);margin:4px 0 10px}
+.chartbox{position:relative}
+canvas{width:100%;height:300px;display:block;touch-action:pan-y}
+.tip{position:absolute;left:4px;top:0;background:rgba(15,23,32,.9);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;pointer-events:none;display:none}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13px;padding:6px 0 10px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.chk{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.chk input{width:auto;min-height:0}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+@media(min-width:620px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:19px;font-weight:700}
+.stat span{color:var(--muted);font-size:12.5px}
+.pos{color:var(--teal)} .neg{color:var(--coral)}
+h2{font-size:16px;margin:22px 0 8px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500;background:var(--panel2)}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--panel2)}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.badge.L{background:rgba(70,194,176,.15);color:var(--teal)} .badge.S{background:rgba(232,100,79,.15);color:var(--coral)}
+.foot{color:var(--muted);font-size:12.5px;margin-top:22px}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Trial<span>.</span></h1>
+  <p class="sub">Backtest a strategy on Bybit perpetual candles.</p>
+
+  <details open>
+    <summary>Market <small id="sumMarket"></small></summary>
+    <div class="body">
+      <div class="row c3">
+        <div><label for="sym">Symbol</label><select id="sym"></select></div>
+        <div><label for="bars">Candles to load</label>
+          <select id="bars"><option>2000</option><option>5000</option><option selected>10000</option><option>20000</option></select></div>
+        <div><label>&nbsp;</label><button class="btn" id="reload" style="width:100%">Reload candles</button></div>
+      </div>
+      <label style="margin-top:12px">Timeframe</label>
+      <div class="pills" id="tfs" role="group" aria-label="Timeframe"></div>
+      <p class="hint" id="span"></p>
+    </div>
+  </details>
+
+  <details open>
+    <summary>Strategy <small id="sumStrat"></small></summary>
+    <div class="body">
+      <label for="strat">Strategy</label>
+      <select id="strat"></select>
+      <div class="row c3" id="params" style="margin-top:10px"></div>
+      <p class="hint" id="stratHint"></p>
+    </div>
+  </details>
+
+  <details open>
+    <summary>Trading rules <small id="sumRules"></small></summary>
+    <div class="body">
+      <div class="row c4">
+        <div><label for="dirMode">Direction</label>
+          <select id="dirMode"><option value="both">Long and short</option><option value="long">Long only</option><option value="short">Short only</option></select></div>
+        <div><label for="capital">Start capital ($)</label><input id="capital" type="number" inputmode="decimal" value="1000" min="1"></div>
+        <div><label for="size">Position size (% of equity)</label><input id="size" type="number" inputmode="decimal" value="100" min="1" max="100"></div>
+        <div><label for="lev">Leverage (x)</label><input id="lev" type="number" inputmode="decimal" value="1" min="1" step="1"></div>
+        <div><label for="fee">Fee per side (%)</label><input id="fee" type="number" inputmode="decimal" value="0.055" min="0" step="0.005"></div>
+        <div><label for="slip">Slippage per side (%)</label><input id="slip" type="number" inputmode="decimal" value="0.02" min="0" step="0.005"></div>
+        <div><label for="sl">Stop loss (%, 0 = off)</label><input id="sl" type="number" inputmode="decimal" value="0" min="0" step="0.1"></div>
+        <div><label for="tp">Take profit (%, 0 = off)</label><input id="tp" type="number" inputmode="decimal" value="0" min="0" step="0.1"></div>
+      </div>
+      <div class="btns" style="margin:10px 0 0">
+        <button class="btn small" data-fee="0.055">Taker 0.055%</button>
+        <button class="btn small" data-fee="0.02">Maker 0.02%</button>
+        <button class="btn small" data-fee="0">No fees</button>
+      </div>
+      <p class="hint">Fee is charged on entry and on exit, on the full position value. With leverage above 1, a liquidation is approximated at 90% of the margin distance.</p>
+    </div>
+  </details>
+
+  <div class="btns">
+    <button class="btn primary" id="run">Run test</button>
+    <button class="btn" id="compare">Compare all strategies</button>
+  </div>
+  <div class="status" id="status" role="status"></div>
+
+  <div id="out" hidden>
+    <div class="hero">
+      <div class="big" id="net"></div>
+      <div class="meta" id="netMeta"></div>
+      <div class="chartbox"><canvas id="chart"></canvas><div class="tip" id="tip"></div></div>
+      <div class="legend">
+        <span><i style="background:var(--amber)"></i>Strategy</span>
+        <span><i style="background:var(--slate)"></i>Buy and hold</span>
+        <span><i style="background:var(--coral)"></i>Drawdown</span>
+        <label class="chk" style="margin-left:auto"><input type="checkbox" id="log"> Log scale</label>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <h2>Trades <span id="tcount" style="color:var(--muted);font-weight:400"></span></h2>
+    <div class="tablewrap"><table id="trades"></table></div>
+    <div class="btns"><button class="btn small" id="more" hidden>Show all trades</button></div>
+  </div>
+
+  <div id="cmpBox" hidden>
+    <h2 id="cmpTitle">Strategy comparison</h2>
+    <div class="tablewrap"><table id="cmp"></table></div>
+    <p class="hint" id="cmpHint"></p>
+    <div class="btns"><button class="btn small" id="cmpMore" hidden>Show all strategies</button></div>
+  </div>
+
+  <p class="foot">Signals are read at candle close and filled at the next candle open. Stop loss and take profit are checked inside the candle, and the stop wins if both are touched. Funding payments are not included. After a stop or take profit the strategy stays out until its signal changes. Past results do not predict future results.</p>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const SYMS=["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","BNBUSDT","LINKUSDT","AVAXUSDT"];
+const TFS=[["15m","15"],["30m","30"],["1H","60"],["2H","120"],["4H","240"],["6H","360"],["12H","720"],["1D","D"]];
+const TFMIN={"15":15,"30":30,"60":60,"120":120,"240":240,"360":360,"720":720,"D":1440};
+
+/* ---------- indicators ---------- */
+function ema(a,n){const k=2/(n+1),o=new Array(a.length);let p=a[0];o[0]=p;for(let i=1;i<a.length;i++){p=a[i]*k+p*(1-k);o[i]=p}return o}
+function rma(a,n){const o=new Array(a.length);let p=a[0];o[0]=p;for(let i=1;i<a.length;i++){p=(p*(n-1)+a[i])/n;o[i]=p}return o}
+function atr(d,n){const tr=new Array(d.c.length);tr[0]=d.h[0]-d.l[0];for(let i=1;i<tr.length;i++){const pc=d.c[i-1];tr[i]=Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-pc),Math.abs(d.l[i]-pc))}return rma(tr,n)}
+function rsi(c,n){const g=[0],l=[0];for(let i=1;i<c.length;i++){const x=c[i]-c[i-1];g.push(Math.max(x,0));l.push(Math.max(-x,0))}const ag=rma(g,n),al=rma(l,n);return ag.map((v,i)=>al[i]===0?100:100-100/(1+v/al[i]))}
+
+/* ---------- strategies: return desired position per bar close (1, -1, 0) ---------- */
+const STRATS={
+  ema2:{name:"EMA cross (2 lines)",
+    hint:"Long while the fast EMA is above the slow EMA, short while below. 50/200 is the classic golden/death cross.",
+    params:[{k:"fast",l:"Fast EMA",v:50},{k:"slow",l:"Slow EMA",v:200}],
+    warm:p=>Math.max(p.fast,p.slow)*2,
+    run(d,p){const f=ema(d.c,p.fast),s=ema(d.c,p.slow);return d.c.map((_,i)=>f[i]>s[i]?1:f[i]<s[i]?-1:0)}},
+  ema3:{name:"Triple EMA cross",
+    hint:"Long when fast > mid > slow, short when fast < mid < slow. Mixed order means the trend is unclear.",
+    params:[{k:"fast",l:"Fast EMA",v:8},{k:"mid",l:"Mid EMA",v:21},{k:"slow",l:"Slow EMA",v:55},
+      {k:"mode",l:"When not aligned",t:"sel",v:"flat",o:[["flat","Go flat"],["hold","Hold until opposite alignment"]]}],
+    warm:p=>Math.max(p.fast,p.mid,p.slow)*2,
+    run(d,p){const f=ema(d.c,p.fast),m=ema(d.c,p.mid),s=ema(d.c,p.slow);let prev=0;
+      return d.c.map((_,i)=>{let x=f[i]>m[i]&&m[i]>s[i]?1:f[i]<m[i]&&m[i]<s[i]?-1:(p.mode==="hold"?prev:0);prev=x;return x})}},
+  ce:{name:"Chandelier Exit",
+    hint:"A trailing ATR stop that flips the trade direction when price closes through it. Default is ATR period 4, multiplier 2.",
+    params:[{k:"period",l:"ATR period",v:4},{k:"mult",l:"Multiplier",v:2,step:.1},
+      {k:"useClose",l:"Highest/lowest of",t:"sel",v:"1",o:[["1","Closes"],["0","Highs and lows"]]}],
+    warm:p=>Math.max(p.period,2)*4,
+    run(d,p){const n=d.c.length,A=atr(d,p.period),out=new Array(n).fill(0);let lsP=0,ssP=0,dir=1;
+      for(let i=0;i<n;i++){
+        let hh=-Infinity,ll=Infinity;const from=Math.max(0,i-p.period+1);
+        for(let j=from;j<=i;j++){const hv=p.useClose==="1"?d.c[j]:d.h[j],lv=p.useClose==="1"?d.c[j]:d.l[j];if(hv>hh)hh=hv;if(lv<ll)ll=lv}
+        let ls=hh-p.mult*A[i],ss=ll+p.mult*A[i];
+        if(i>0){if(d.c[i-1]>lsP)ls=Math.max(ls,lsP);if(d.c[i-1]<ssP)ss=Math.min(ss,ssP);
+          if(d.c[i]>ssP)dir=1;else if(d.c[i]<lsP)dir=-1}
+        out[i]=dir;lsP=ls;ssP=ss}
+      return out}},
+  macd:{name:"MACD signal cross",
+    hint:"Long while the MACD line is above its signal line, short while below.",
+    params:[{k:"fast",l:"Fast EMA",v:12},{k:"slow",l:"Slow EMA",v:26},{k:"sig",l:"Signal",v:9}],
+    warm:p=>Math.max(p.fast,p.slow)*3,
+    run(d,p){const a=ema(d.c,p.fast),b=ema(d.c,p.slow),m=a.map((v,i)=>v-b[i]),s=ema(m,p.sig);return m.map((v,i)=>v>s[i]?1:v<s[i]?-1:0)}},
+  rsi:{name:"RSI reversal",
+    hint:"Long when RSI crosses back above the low level, short when it crosses back below the high level. Optionally exit at 50.",
+    params:[{k:"len",l:"RSI length",v:14},{k:"lo",l:"Low level",v:30},{k:"hi",l:"High level",v:70},
+      {k:"mid",l:"Exit at 50",t:"sel",v:"1",o:[["1","Yes"],["0","No, reverse only"]]}],
+    warm:p=>p.len*4,
+    run(d,p){const r=rsi(d.c,p.len);let pos=0;return r.map((v,i)=>{if(i>0){const q=r[i-1];
+      if(q<p.lo&&v>=p.lo)pos=1;else if(q>p.hi&&v<=p.hi)pos=-1;
+      else if(p.mid==="1"){if(pos===1&&v>=50)pos=0;else if(pos===-1&&v<=50)pos=0}}return pos})}}
+};
+
+/* ---------- extra helpers ---------- */
+const sgn=x=>x>0?1:x<0?-1:0;
+const sma=(a,n)=>{const o=new Array(a.length);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];o[i]=i>=n-1?s/n:s/(i+1)}return o};
+function wma(a,n){const o=new Array(a.length);for(let i=0;i<a.length;i++){const m=Math.min(n,i+1),dn=m*(m+1)/2;let s=0;for(let j=0;j<m;j++)s+=a[i-j]*(m-j);o[i]=s/dn}return o}
+function hma(a,n){const h=Math.max(1,Math.round(n/2)),q=Math.max(1,Math.round(Math.sqrt(n))),w1=wma(a,h),w2=wma(a,n);return wma(w1.map((v,i)=>2*v-w2[i]),q)}
+function dema(a,n){const e=ema(a,n),e2=ema(e,n);return e.map((v,i)=>2*v-e2[i])}
+function tema(a,n){const e=ema(a,n),e2=ema(e,n),e3=ema(e2,n);return e.map((v,i)=>3*v-3*e2[i]+e3[i])}
+function kama(a,n,f=2,s=30){const o=[a[0]],fa=2/(f+1),sa=2/(s+1);for(let i=1;i<a.length;i++){const j=Math.max(0,i-n);let vol=0;for(let k=j+1;k<=i;k++)vol+=Math.abs(a[k]-a[k-1]);const er=vol===0?0:Math.abs(a[i]-a[j])/vol,sc=(er*(fa-sa)+sa)**2;o.push(o[i-1]+sc*(a[i]-o[i-1]))}return o}
+function stdev(a,n){const o=[];for(let i=0;i<a.length;i++){const s=Math.max(0,i-n+1),m=i-s+1;let u=0;for(let j=s;j<=i;j++)u+=a[j];u/=m;let q=0;for(let j=s;j<=i;j++)q+=(a[j]-u)**2;o.push(Math.sqrt(q/m))}return o}
+function hhv(a,n,lag=0){const o=[];for(let i=0;i<a.length;i++){const e=i-lag;if(e<0){o.push(a[i]);continue}let m=-Infinity;for(let j=Math.max(0,e-n+1);j<=e;j++)if(a[j]>m)m=a[j];o.push(m)}return o}
+function llv(a,n,lag=0){const o=[];for(let i=0;i<a.length;i++){const e=i-lag;if(e<0){o.push(a[i]);continue}let m=Infinity;for(let j=Math.max(0,e-n+1);j<=e;j++)if(a[j]<m)m=a[j];o.push(m)}return o}
+function linreg(a,n){const val=[],slope=[];for(let i=0;i<a.length;i++){const m=Math.min(n,i+1);if(m<2){val.push(a[i]);slope.push(0);continue}let sx=0,sy=0,sxy=0,sxx=0;for(let j=0;j<m;j++){const y=a[i-m+1+j];sx+=j;sy+=y;sxy+=j*y;sxx+=j*j}const b=(m*sxy-sx*sy)/(m*sxx-sx*sx),A=(sy-b*sx)/m;val.push(A+b*(m-1));slope.push(b)}return{val,slope}}
+function dmi(d,n){const L=d.c.length,pdm=[0],ndm=[0],tr=[d.h[0]-d.l[0]];for(let i=1;i<L;i++){const up=d.h[i]-d.h[i-1],dn=d.l[i-1]-d.l[i];pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0);tr.push(Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-d.c[i-1]),Math.abs(d.l[i]-d.c[i-1])))}
+  const a=rma(tr,n),p=rma(pdm,n),m=rma(ndm,n),pdi=p.map((v,i)=>a[i]?100*v/a[i]:0),ndi=m.map((v,i)=>a[i]?100*v/a[i]:0);
+  const dx=pdi.map((v,i)=>{const s=v+ndi[i];return s?100*Math.abs(v-ndi[i])/s:0});return{pdi,ndi,adx:rma(dx,n)}}
+function supertrend(d,n,m){const A=atr(d,n),L=d.c.length,dir=new Array(L).fill(1);let fu=0,fl=0;for(let i=0;i<L;i++){const hl=(d.h[i]+d.l[i])/2,bu=hl+m*A[i],bl=hl-m*A[i];if(i===0){fu=bu;fl=bl;continue}const pc=d.c[i-1];fu=(bu<fu||pc>fu)?bu:fu;fl=(bl>fl||pc<fl)?bl:fl;let di=dir[i-1];if(di===1&&d.c[i]<fl)di=-1;else if(di===-1&&d.c[i]>fu)di=1;dir[i]=di}return dir}
+function psar(d,st,mx){const L=d.c.length,dir=new Array(L).fill(1);let up=true,sar=d.l[0],ep=d.h[0],af=st;for(let i=1;i<L;i++){sar=sar+af*(ep-sar);if(up){sar=Math.min(sar,d.l[i-1],i>1?d.l[i-2]:d.l[i-1]);if(d.l[i]<sar){up=false;sar=ep;ep=d.l[i];af=st}else if(d.h[i]>ep){ep=d.h[i];af=Math.min(af+st,mx)}}else{sar=Math.max(sar,d.h[i-1],i>1?d.h[i-2]:d.h[i-1]);if(d.h[i]>sar){up=true;sar=ep;ep=d.h[i];af=st}else if(d.l[i]<ep){ep=d.l[i];af=Math.min(af+st,mx)}}dir[i]=up?1:-1}return dir}
+const typ=d=>d.c.map((c,i)=>(d.h[i]+d.l[i]+c)/3);
+function cciArr(d,n){const tp=typ(d),sm=sma(tp,n);return tp.map((v,i)=>{const s=Math.max(0,i-n+1),m=i-s+1;let md=0;for(let j=s;j<=i;j++)md+=Math.abs(tp[j]-sm[i]);md/=m;return md===0?0:(v-sm[i])/(0.015*md)})}
+function revCross(x,lo,hi,mid,useMid){let pos=0;return x.map((v,i)=>{if(i>0){const q=x[i-1];if(q<lo&&v>=lo)pos=1;else if(q>hi&&v<=hi)pos=-1;else if(useMid){if(pos===1&&v>=mid)pos=0;else if(pos===-1&&v<=mid)pos=0}}return pos})}
+function bands(c,n,k){const m=sma(c,n),s=stdev(c,n);return{m,u:m.map((v,i)=>v+k*s[i]),l:m.map((v,i)=>v-k*s[i])}}
+function chanBreak(c,u,l,m){let pos=0;return c.map((v,i)=>{if(v>u[i])pos=1;else if(v<l[i])pos=-1;else if(pos===1&&v<m[i])pos=0;else if(pos===-1&&v>m[i])pos=0;return pos})}
+function alignDir(lines,mode){let prev=0;return lines[0].map((_,i)=>{let up=true,dn=true;for(let k=0;k<lines.length-1;k++){if(!(lines[k][i]>lines[k+1][i]))up=false;if(!(lines[k][i]<lines[k+1][i]))dn=false}const x=up?1:dn?-1:(mode==="hold"?prev:0);prev=x;return x})}
+
+/* ---------- 50 extra strategies ---------- */
+const N=(k,l,v,step)=>({k,l,v,step});
+const SEL=(k,l,v,o)=>({k,l,t:"sel",v,o});
+const MODE=l=>SEL("mode",l||"When not aligned","flat",[["flat","Go flat"],["hold","Hold last signal"]]);
+function add(id,cat,name,hint,params,warm,run){STRATS[id]={cat,name,hint,params,warm,run}}
+const CATS={ema2:"Moving averages",ema3:"Moving averages",ce:"Trend and breakout",macd:"Momentum and volume",rsi:"Reversal"};
+Object.keys(CATS).forEach(k=>STRATS[k].cat=CATS[k]);
+const MA="Moving averages",TR="Trend and breakout",MO="Momentum and volume",RV="Reversal",CB="Filtered combos";
+
+/* Moving averages */
+add("sma2",MA,"SMA cross (2 lines)","Long while the fast SMA is above the slow SMA, short while below.",[N("fast","Fast SMA",50),N("slow","Slow SMA",200)],p=>Math.max(p.fast,p.slow)+5,(d,p)=>{const f=sma(d.c,p.fast),s=sma(d.c,p.slow);return d.c.map((_,i)=>sgn(f[i]-s[i]))});
+add("sma3",MA,"Triple SMA alignment","Long when fast > mid > slow SMA, short when fast < mid < slow.",[N("fast","Fast SMA",10),N("mid","Mid SMA",30),N("slow","Slow SMA",90),MODE()],p=>p.slow+5,(d,p)=>alignDir([sma(d.c,p.fast),sma(d.c,p.mid),sma(d.c,p.slow)],p.mode));
+add("dema2",MA,"DEMA cross","Double EMA cuts lag. Long while the fast DEMA is above the slow DEMA.",[N("fast","Fast DEMA",21),N("slow","Slow DEMA",55)],p=>Math.max(p.fast,p.slow)*2,(d,p)=>{const f=dema(d.c,p.fast),s=dema(d.c,p.slow);return d.c.map((_,i)=>sgn(f[i]-s[i]))});
+add("tema2",MA,"TEMA cross","Triple EMA cuts lag even more. Long while the fast TEMA is above the slow TEMA.",[N("fast","Fast TEMA",21),N("slow","Slow TEMA",55)],p=>Math.max(p.fast,p.slow)*2,(d,p)=>{const f=tema(d.c,p.fast),s=tema(d.c,p.slow);return d.c.map((_,i)=>sgn(f[i]-s[i]))});
+add("hma",MA,"Hull MA slope","Long while the Hull moving average is rising, short while falling.",[N("len","Hull length",55)],p=>p.len*2,(d,p)=>{const h=hma(d.c,p.len);return h.map((v,i)=>i?sgn(v-h[i-1]):0)});
+add("kama",MA,"KAMA trend","Adaptive moving average that slows down in chop. Long while price is above it.",[N("len","Efficiency length",10),N("fast","Fast period",2),N("slow","Slow period",30)],p=>p.len*4+p.slow,(d,p)=>{const k=kama(d.c,p.len,p.fast,p.slow);return d.c.map((c,i)=>sgn(c-k[i]))});
+add("zlsma",MA,"ZLSMA trend","Zero-lag least squares MA. Long while price is above it.",[N("len","Length",32)],p=>p.len*3,(d,p)=>{const a=linreg(d.c,p.len).val,b=linreg(a,p.len).val;return d.c.map((c,i)=>sgn(c-(2*a[i]-b[i])))});
+add("pema",MA,"Price vs EMA","Long while the close is above one EMA, short while below. The simplest trend filter.",[N("len","EMA length",200)],p=>p.len*2,(d,p)=>{const e=ema(d.c,p.len);return d.c.map((c,i)=>sgn(c-e[i]))});
+add("linreg",MA,"Linear regression slope","Long while the regression line over the last N candles slopes up.",[N("len","Length",50)],p=>p.len*2,(d,p)=>linreg(d.c,p.len).slope.map(sgn));
+add("alligator",MA,"Williams Alligator","Long when lips > teeth > jaw (mouth open up), short when reversed, flat when tangled.",[N("jaw","Jaw length",13),N("teeth","Teeth length",8),N("lips","Lips length",5)],p=>p.jaw*4,(d,p)=>{const m=d.c.map((_,i)=>(d.h[i]+d.l[i])/2),J=rma(m,p.jaw),T=rma(m,p.teeth),L=rma(m,p.lips);const sh=(a,k)=>a.map((_,i)=>a[Math.max(0,i-k)]);return alignDir([sh(L,3),sh(T,5),sh(J,8)],"flat")});
+add("ichimoku",MA,"Ichimoku cloud","Long when price closes above the cloud, short below. Inside the cloud follows your choice.",[N("tenkan","Tenkan",9),N("kijun","Kijun",26),N("senkou","Senkou B",52),MODE("Inside the cloud")],p=>(p.senkou+p.kijun)*2,(d,p)=>{const mid=n=>{const h=hhv(d.h,n),l=llv(d.l,n);return h.map((v,i)=>(v+l[i])/2)};const t=mid(p.tenkan),k=mid(p.kijun),sb=mid(p.senkou);let prev=0;return d.c.map((c,i)=>{const j=i-p.kijun;if(j<0)return 0;const a=(t[j]+k[j])/2,b=sb[j],top=Math.max(a,b),bot=Math.min(a,b);if(c>top)prev=1;else if(c<bot)prev=-1;else if(p.mode==="flat")prev=0;return prev})});
+add("ha",MA,"Heikin-Ashi trend","Smoothed candles. Long after N green Heikin-Ashi candles in a row, short after N red.",[N("n","Candles to confirm",2)],p=>20,(d,p)=>{let ho=(d.o[0]+d.c[0])/2,hc=(d.o[0]+d.h[0]+d.l[0]+d.c[0])/4,pos=0,run=0,last=0;return d.c.map((_,i)=>{if(i>0){const nho=(ho+hc)/2;hc=(d.o[i]+d.h[i]+d.l[i]+d.c[i])/4;ho=nho}const cl=hc>ho?1:-1;if(cl===last)run++;else{run=1;last=cl}if(run>=p.n)pos=cl;return pos})});
+add("ribbon",MA,"EMA ribbon (8-89)","Long when the 8/13/21/34/55/89 EMAs are fully stacked upward, short when stacked downward.",[MODE()],p=>180,(d,p)=>alignDir([8,13,21,34,55,89].map(n=>ema(d.c,n)),p.mode));
+
+/* Trend and breakout */
+add("supertrend",TR,"Supertrend","ATR-based trailing line. Long while price is above it, short while below.",[N("len","ATR length",10),N("mult","Multiplier",3,.1)],p=>p.len*4,(d,p)=>supertrend(d,p.len,p.mult));
+add("psar",TR,"Parabolic SAR","Stop-and-reverse dots. Long while the dots are below price.",[N("step","Step",0.02,.005),N("max","Max step",0.2,.01)],p=>30,(d,p)=>psar(d,p.step,p.max));
+add("adxdi",TR,"ADX with DI cross","Trade the +DI/-DI cross only while ADX shows a real trend, flat otherwise.",[N("len","Length",14),N("th","ADX threshold",20)],p=>p.len*4,(d,p)=>{const m=dmi(d,p.len);return d.c.map((_,i)=>m.adx[i]>p.th?sgn(m.pdi[i]-m.ndi[i]):0)});
+add("aroon",TR,"Aroon cross","Long when Aroon-up is above Aroon-down (new highs are more recent than new lows).",[N("len","Length",25)],p=>p.len*3,(d,p)=>{const n=p.len;return d.c.map((_,i)=>{const s=Math.max(0,i-n);let hi=s,lo=s;for(let j=s;j<=i;j++){if(d.h[j]>=d.h[hi])hi=j;if(d.l[j]<=d.l[lo])lo=j}return sgn(lo-hi)})});
+add("vortex",TR,"Vortex cross","Long when +VI is above -VI, short when below.",[N("len","Length",14)],p=>p.len*3,(d,p)=>{const vp=[0],vm=[0],tr=[d.h[0]-d.l[0]];for(let i=1;i<d.c.length;i++){vp.push(Math.abs(d.h[i]-d.l[i-1]));vm.push(Math.abs(d.l[i]-d.h[i-1]));tr.push(Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-d.c[i-1]),Math.abs(d.l[i]-d.c[i-1])))}const a=sma(vp,p.len),b=sma(vm,p.len);return a.map((v,i)=>sgn(v-b[i]))});
+add("donch",TR,"Donchian breakout","Long on a close above the prior N-candle high, short on a close below the prior N-candle low.",[N("len","Channel length",20)],p=>p.len*2,(d,p)=>{const h=hhv(d.h,p.len,1),l=llv(d.l,p.len,1);let pos=0;return d.c.map((c,i)=>{if(i>p.len){if(c>h[i])pos=1;else if(c<l[i])pos=-1}return pos})});
+add("turtle",TR,"Turtle system","Enter on a long channel breakout, exit to flat on a shorter opposite channel (55/20 is System 2).",[N("entry","Entry channel",55),N("exit","Exit channel",20)],p=>p.entry*2,(d,p)=>{const eh=hhv(d.h,p.entry,1),el=llv(d.l,p.entry,1),xh=hhv(d.h,p.exit,1),xl=llv(d.l,p.exit,1);let pos=0;return d.c.map((c,i)=>{if(i<=p.entry)return 0;if(c>eh[i])pos=1;else if(c<el[i])pos=-1;else if(pos===1&&c<xl[i])pos=0;else if(pos===-1&&c>xh[i])pos=0;return pos})});
+add("keltner",TR,"Keltner breakout","Long on a close above the upper Keltner band, short below the lower, exit at the middle EMA.",[N("len","Length",20),N("mult","ATR multiplier",2,.1)],p=>p.len*3,(d,p)=>{const m=ema(d.c,p.len),A=atr(d,p.len);return chanBreak(d.c,m.map((v,i)=>v+p.mult*A[i]),m.map((v,i)=>v-p.mult*A[i]),m)});
+add("bbbreak",TR,"Bollinger breakout","Long on a close above the upper band, short below the lower, exit at the middle band.",[N("len","Length",20),N("k","Std deviations",2,.1)],p=>p.len*2,(d,p)=>{const b=bands(d.c,p.len,p.k);return chanBreak(d.c,b.u,b.l,b.m)});
+add("squeeze",TR,"TTM Squeeze","When Bollinger bands exit the Keltner channel (squeeze release), trade the momentum direction until momentum crosses zero.",[N("len","Length",20),N("bbk","Bollinger std dev",2,.1),N("kck","Keltner multiplier",1.5,.1)],p=>p.len*4,(d,p)=>{const b=bands(d.c,p.len,p.bbk),km=ema(d.c,p.len),A=atr(d,p.len);const on=d.c.map((_,i)=>b.u[i]<km[i]+p.kck*A[i]&&b.l[i]>km[i]-p.kck*A[i]);const hh=hhv(d.h,p.len),ll=llv(d.l,p.len),sm=sma(d.c,p.len);const mom=linreg(d.c.map((c,i)=>c-((hh[i]+ll[i])/2+sm[i])/2),p.len).val;let pos=0;return d.c.map((_,i)=>{if(i===0)return 0;if(on[i-1]&&!on[i])pos=sgn(mom[i]);else if(pos===1&&mom[i]<0)pos=0;else if(pos===-1&&mom[i]>0)pos=0;return pos})});
+add("engulf",TR,"Engulfing candles","Long after a bullish engulfing candle, short after a bearish one, holds until the opposite pattern.",[],p=>10,(d,p)=>{let pos=0;return d.c.map((c,i)=>{if(i>0){const po=d.o[i-1],pc=d.c[i-1];if(pc<po&&c>d.o[i]&&c>=po&&d.o[i]<=pc)pos=1;else if(pc>po&&c<d.o[i]&&c<=po&&d.o[i]>=pc)pos=-1}return pos})});
+
+/* Momentum and volume */
+add("macd0",MO,"MACD zero line","Long while the MACD line is above zero, short while below.",[N("fast","Fast EMA",12),N("slow","Slow EMA",26)],p=>Math.max(p.fast,p.slow)*3,(d,p)=>{const a=ema(d.c,p.fast),b=ema(d.c,p.slow);return a.map((v,i)=>sgn(v-b[i]))});
+add("trix",MO,"TRIX signal cross","Triple-smoothed rate of change. Long when TRIX is above its signal line.",[N("len","TRIX length",15),N("sig","Signal",9)],p=>p.len*6,(d,p)=>{const e=ema(ema(ema(d.c.map(Math.log),p.len),p.len),p.len),t=e.map((v,i)=>i?(v-e[i-1])*10000:0),s=ema(t,p.sig);return t.map((v,i)=>sgn(v-s[i]))});
+add("roc",MO,"Momentum (ROC)","Long when price is higher than N candles ago, short when lower.",[N("len","Look-back candles",60)],p=>p.len+5,(d,p)=>d.c.map((c,i)=>i>=p.len?sgn(c-d.c[i-p.len]):0));
+add("ao",MO,"Awesome Oscillator","Long while the 5/34 SMA of median price is above zero, short while below.",[N("fast","Fast",5),N("slow","Slow",34)],p=>p.slow*2,(d,p)=>{const m=d.c.map((_,i)=>(d.h[i]+d.l[i])/2),a=sma(m,p.fast),b=sma(m,p.slow);return a.map((v,i)=>sgn(v-b[i]))});
+add("cci",MO,"CCI trend","Long when CCI rises above +level, short when it falls below -level, holds in between.",[N("len","Length",20),N("lvl","Level",100)],p=>p.len*3,(d,p)=>{const c=cciArr(d,p.len);let pos=0;return c.map(v=>{if(v>p.lvl)pos=1;else if(v<-p.lvl)pos=-1;return pos})});
+add("rsi50",MO,"RSI trend (50 line)","Long when RSI is above 50 plus a buffer, short below 50 minus the buffer, holds in between.",[N("len","RSI length",14),N("band","Buffer",5)],p=>p.len*4,(d,p)=>{const r=rsi(d.c,p.len);let pos=0;return r.map(v=>{if(v>50+p.band)pos=1;else if(v<50-p.band)pos=-1;return pos})});
+add("fisher",MO,"Fisher Transform","Long when the Fisher line crosses above its one-candle-ago value, short when below.",[N("len","Length",10)],p=>p.len*4,(d,p)=>{const hl=d.c.map((_,i)=>(d.h[i]+d.l[i])/2),hh=hhv(hl,p.len),ll=llv(hl,p.len);let v=0,f=0;return hl.map((x,i)=>{const r=hh[i]===ll[i]?0:(x-ll[i])/(hh[i]-ll[i])-0.5;v=Math.max(-0.999,Math.min(0.999,0.66*r+0.67*v));const pf=f;f=0.5*Math.log((1+v)/(1-v))+0.5*f;return sgn(f-pf)})});
+add("elder",MO,"Elder Ray","Long when the EMA rises and bear power is negative but improving, short on the mirror image.",[N("len","EMA length",13)],p=>p.len*3,(d,p)=>{const e=ema(d.c,p.len);let pos=0;return d.c.map((_,i)=>{if(i<1)return 0;const bull=d.h[i]-e[i],bear=d.l[i]-e[i],pb=d.h[i-1]-e[i-1],pr=d.l[i-1]-e[i-1];if(e[i]>e[i-1]&&bear<0&&bear>pr)pos=1;else if(e[i]<e[i-1]&&bull>0&&bull<pb)pos=-1;return pos})});
+add("force",MO,"Force Index","Long while the smoothed price-times-volume force is above zero.",[N("len","EMA length",13)],p=>p.len*3,(d,p)=>{const f=d.c.map((c,i)=>i?(c-d.c[i-1])*d.v[i]:0);return ema(f,p.len).map(sgn)});
+add("obv",MO,"On-Balance Volume trend","Long while OBV is above its own EMA, short while below.",[N("len","EMA length",50)],p=>p.len*2,(d,p)=>{const o=[0];for(let i=1;i<d.c.length;i++)o.push(o[i-1]+sgn(d.c[i]-d.c[i-1])*d.v[i]);const e=ema(o,p.len);return o.map((v,i)=>sgn(v-e[i]))});
+add("cmf",MO,"Chaikin Money Flow","Long when money flow is above the threshold, short below minus the threshold, holds in between.",[N("len","Length",20),N("th","Threshold",0.05,.01)],p=>p.len*3,(d,p)=>{const mfv=d.c.map((c,i)=>{const r=d.h[i]-d.l[i];return r===0?0:((2*c-d.h[i]-d.l[i])/r)*d.v[i]}),a=sma(mfv,p.len),b=sma(d.v,p.len);let pos=0;return a.map((v,i)=>{const x=b[i]?v/b[i]:0;if(x>p.th)pos=1;else if(x<-p.th)pos=-1;return pos})});
+add("vwap",MO,"Rolling VWAP","Long while the close is above the volume-weighted average price of the last N candles.",[N("len","Candles",100)],p=>p.len*2,(d,p)=>{const tp=typ(d),a=sma(tp.map((v,i)=>v*d.v[i]),p.len),b=sma(d.v,p.len);return d.c.map((c,i)=>b[i]?sgn(c-a[i]/b[i]):0)});
+
+/* Reversal */
+add("stoch",RV,"Stochastic reversal","Long when %K crosses back above the oversold level, short when it crosses back below overbought.",[N("len","%K length",14),N("sm","Smoothing",3),N("lo","Oversold",20),N("hi","Overbought",80),SEL("mid","Exit at 50","1",[["1","Yes"],["0","No, reverse only"]])],p=>p.len*4,(d,p)=>{const hh=hhv(d.h,p.len),ll=llv(d.l,p.len),raw=d.c.map((c,i)=>hh[i]===ll[i]?50:(c-ll[i])/(hh[i]-ll[i])*100);return revCross(sma(raw,p.sm),p.lo,p.hi,50,p.mid==="1")});
+add("stochrsi",RV,"Stochastic RSI reversal","Stochastic of RSI. Faster than RSI itself. Long on a cross back above oversold, short below overbought.",[N("len","RSI length",14),N("k","Stoch length",14),N("lo","Oversold",20),N("hi","Overbought",80),SEL("mid","Exit at 50","1",[["1","Yes"],["0","No, reverse only"]])],p=>(p.len+p.k)*4,(d,p)=>{const r=rsi(d.c,p.len),hh=hhv(r,p.k),ll=llv(r,p.k),raw=r.map((v,i)=>hh[i]===ll[i]?50:(v-ll[i])/(hh[i]-ll[i])*100);return revCross(sma(raw,3),p.lo,p.hi,50,p.mid==="1")});
+add("williams",RV,"Williams %R reversal","Long when %R crosses back above -80, short when it crosses back below -20.",[N("len","Length",14),N("lo","Oversold",-80),N("hi","Overbought",-20),SEL("mid","Exit at -50","1",[["1","Yes"],["0","No, reverse only"]])],p=>p.len*4,(d,p)=>{const hh=hhv(d.h,p.len),ll=llv(d.l,p.len),w=d.c.map((c,i)=>hh[i]===ll[i]?-50:-100*(hh[i]-c)/(hh[i]-ll[i]));return revCross(w,p.lo,p.hi,-50,p.mid==="1")});
+add("mfi",RV,"Money Flow Index reversal","Volume-weighted RSI. Long on a cross back above 20, short on a cross back below 80.",[N("len","Length",14),N("lo","Oversold",20),N("hi","Overbought",80),SEL("mid","Exit at 50","1",[["1","Yes"],["0","No, reverse only"]])],p=>p.len*4,(d,p)=>{const tp=typ(d),pos=[0],neg=[0];for(let i=1;i<tp.length;i++){const mf=tp[i]*d.v[i];pos.push(tp[i]>tp[i-1]?mf:0);neg.push(tp[i]<tp[i-1]?mf:0)}const a=sma(pos,p.len),b=sma(neg,p.len);return revCross(a.map((v,i)=>b[i]===0?100:100-100/(1+v/b[i])),p.lo,p.hi,50,p.mid==="1")});
+add("rsi2",RV,"Connors RSI(2)","Buy a very oversold dip while price is above its 200 SMA, sell a spike while below. Exit when RSI recovers.",[N("len","RSI length",2),N("lo","Entry level",10),N("exit","Exit level",70),N("trend","Trend SMA",200)],p=>p.trend+5,(d,p)=>{const r=rsi(d.c,p.len),e=sma(d.c,p.trend);let pos=0;return d.c.map((c,i)=>{if(i<p.trend)return 0;if(c>e[i]&&r[i]<p.lo)pos=1;else if(c<e[i]&&r[i]>100-p.lo)pos=-1;else if(pos===1&&r[i]>p.exit)pos=0;else if(pos===-1&&r[i]<100-p.exit)pos=0;return pos})});
+add("ccirev",RV,"CCI reversal","Long when CCI crosses back above -level, short when it crosses back below +level, exit at zero.",[N("len","Length",20),N("lvl","Level",100)],p=>p.len*3,(d,p)=>revCross(cciArr(d,p.len),-p.lvl,p.lvl,0,true));
+add("bbrev",RV,"Bollinger reversion","Long when price closes below the lower band, short above the upper, exit at the middle band.",[N("len","Length",20),N("k","Std deviations",2,.1)],p=>p.len*2,(d,p)=>{const b=bands(d.c,p.len,p.k);let pos=0;return d.c.map((c,i)=>{if(c<b.l[i])pos=1;else if(c>b.u[i])pos=-1;else if(pos===1&&c>b.m[i])pos=0;else if(pos===-1&&c<b.m[i])pos=0;return pos})});
+add("zscore",RV,"Z-score reversion","Long when price is N standard deviations below its average, short above, exit at the average.",[N("len","Average length",50),N("k","Entry z-score",2,.1)],p=>p.len*2,(d,p)=>{const m=sma(d.c,p.len),s=stdev(d.c,p.len);let pos=0;return d.c.map((c,i)=>{const z=s[i]?(c-m[i])/s[i]:0;if(z<-p.k)pos=1;else if(z>p.k)pos=-1;else if(pos===1&&z>=0)pos=0;else if(pos===-1&&z<=0)pos=0;return pos})});
+add("rsibb",RV,"RSI + Bollinger reversal","Needs both: price outside the band and RSI extreme. Exit at the middle band.",[N("len","Band length",20),N("k","Std deviations",2,.1),N("rl","RSI length",14),N("lvl","RSI level",30)],p=>Math.max(p.len,p.rl)*4,(d,p)=>{const b=bands(d.c,p.len,p.k),r=rsi(d.c,p.rl);let pos=0;return d.c.map((c,i)=>{if(c<b.l[i]&&r[i]<p.lvl)pos=1;else if(c>b.u[i]&&r[i]>100-p.lvl)pos=-1;else if(pos===1&&c>b.m[i])pos=0;else if(pos===-1&&c<b.m[i])pos=0;return pos})});
+
+/* Filtered combos */
+add("macdema",CB,"MACD + EMA trend filter","MACD cross, but only longs above the EMA and only shorts below it.",[N("fast","MACD fast",12),N("slow","MACD slow",26),N("sig","Signal",9),N("trend","Trend EMA",200)],p=>p.trend*2,(d,p)=>{const a=ema(d.c,p.fast),b=ema(d.c,p.slow),m=a.map((v,i)=>v-b[i]),s=ema(m,p.sig),e=ema(d.c,p.trend);return d.c.map((c,i)=>c>e[i]&&m[i]>s[i]?1:c<e[i]&&m[i]<s[i]?-1:0)});
+add("emaadx",CB,"EMA cross + ADX filter","EMA cross, but flat whenever ADX says there is no trend.",[N("fast","Fast EMA",21),N("slow","Slow EMA",55),N("len","ADX length",14),N("th","ADX threshold",20)],p=>Math.max(p.fast,p.slow)*2,(d,p)=>{const f=ema(d.c,p.fast),s=ema(d.c,p.slow),m=dmi(d,p.len);return d.c.map((_,i)=>m.adx[i]>p.th?sgn(f[i]-s[i]):0)});
+add("stema",CB,"Supertrend + EMA filter","Supertrend direction, but only longs above the EMA and only shorts below it.",[N("len","ATR length",10),N("mult","Multiplier",3,.1),N("trend","Trend EMA",200)],p=>p.trend*2,(d,p)=>{const st=supertrend(d,p.len,p.mult),e=ema(d.c,p.trend);return d.c.map((c,i)=>c>e[i]?(st[i]===1?1:0):(st[i]===-1?-1:0))});
+add("ceema",CB,"Chandelier Exit + EMA filter","Chandelier Exit flips, but only longs above the EMA and only shorts below it.",[N("period","ATR period",22),N("mult","Multiplier",3,.1),N("trend","Trend EMA",200)],p=>p.trend*2,(d,p)=>{const ce=STRATS.ce.run(d,{period:p.period,mult:p.mult,useClose:"1"}),e=ema(d.c,p.trend);return d.c.map((c,i)=>c>e[i]?(ce[i]===1?1:0):(ce[i]===-1?-1:0))});
+add("rsipull",CB,"Trend pullback (EMA + RSI)","Buy RSI dips inside an uptrend, sell RSI spikes inside a downtrend, exit when RSI normalises.",[N("trend","Trend EMA",200),N("len","RSI length",14),N("lvl","Dip level",40)],p=>p.trend*2,(d,p)=>{const e=ema(d.c,p.trend),r=rsi(d.c,p.len);let pos=0;return d.c.map((c,i)=>{if(c>e[i]&&r[i]<p.lvl)pos=1;else if(c<e[i]&&r[i]>100-p.lvl)pos=-1;else if(pos===1&&(r[i]>70||c<e[i]))pos=0;else if(pos===-1&&(r[i]<30||c>e[i]))pos=0;return pos})});
+
+
+/* ---------- state ---------- */
+const DEF={sym:"BTCUSDT",tf:"240",bars:"10000",strat:"ema2",params:{},
+  cfg:{dirMode:"both",capital:1000,size:100,lev:1,fee:0.055,slip:0.02,sl:0,tp:0}};
+let S=JSON.parse(JSON.stringify(DEF));
+try{const x=JSON.parse(localStorage.getItem("trial.v1")||"null");if(x){S={...S,...x,cfg:{...S.cfg,...(x.cfg||{})}}}}catch(e){}
+function save(){try{localStorage.setItem("trial.v1",JSON.stringify(S))}catch(e){}}
+let DATA=null,RES=null,showAll=false,busy=false;
+const CACHE={};
+
+/* ---------- data ---------- */
+async function getJSON(url){
+  for(const host of ["https://api.bybit.com","https://api.bytick.com"]){
+    try{const r=await fetch(host+url);const j=await r.json();if(j.retCode===0)return j;if(j.retMsg)throw new Error(j.retMsg)}catch(e){if(host.includes("bytick"))throw e}
+  }
+}
+async function loadCandles(sym,iv,count){
+  const key=sym+"|"+iv;
+  if(CACHE[key]&&CACHE[key].length>=count)return CACHE[key].slice(-count);
+  let rows=[],end=Date.now();
+  while(rows.length<count){
+    const j=await getJSON(`/v5/market/kline?category=linear&symbol=${sym}&interval=${iv}&limit=1000&end=${end}`);
+    const l=j.result.list;if(!l.length)break;
+    rows.push(...l);end=+l[l.length-1][0]-1;
+    setStatus(`Loading candles… ${Math.min(rows.length,count).toLocaleString()} of ${count.toLocaleString()}`);
+    if(l.length<1000)break;
+  }
+  rows.sort((a,b)=>a[0]-b[0]);
+  const seen=new Set();rows=rows.filter(r=>!seen.has(r[0])&&seen.add(r[0]));
+  const tfms=TFMIN[iv]*60000;
+  if(rows.length&&+rows[rows.length-1][0]+tfms>Date.now())rows.pop();
+  CACHE[key]=rows;
+  return rows.slice(-count);
+}
+function toData(rows){const d={t:[],o:[],h:[],l:[],c:[],v:[]};for(const r of rows){d.t.push(+r[0]);d.o.push(+r[1]);d.h.push(+r[2]);d.l.push(+r[3]);d.c.push(+r[4]);d.v.push(+r[5])}return d}
+
+/* ---------- backtest ---------- */
+function backtest(d,dirs,warm,c,tfmin){
+  const n=d.c.length,fee=c.fee/100,slip=c.slip/100,lev=Math.max(1,c.lev),sizeF=Math.min(100,Math.max(1,c.size))/100;
+  let eq=c.capital,pos=0,units=0,entry=0,entryI=0,entryEq=0,entryFee=0,fees=0,blocked=0,pend=0,inBars=0;
+  const curve=new Array(n).fill(c.capital),dd=new Array(n).fill(0),trades=[];
+  function open(dirn,price,i){
+    const px=dirn===1?price*(1+slip):price*(1-slip);
+    const margin=eq*sizeF,notional=margin*lev;
+    units=notional/px;entryFee=notional*fee;eq-=entryFee;fees+=entryFee;
+    pos=dirn;entry=px;entryI=i;entryEq=eq+entryFee;
+  }
+  function close(price,i,reason){
+    const px=pos===1?price*(1-slip):price*(1+slip);
+    const gross=pos*units*(px-entry),exitFee=units*px*fee;
+    eq+=gross-exitFee;if(eq<0)eq=0;fees+=exitFee;
+    const pnl=gross-exitFee-entryFee;
+    trades.push({dir:pos,t0:d.t[entryI],t1:d.t[i],p0:entry,p1:px,pnl,ret:pnl/entryEq*100,reason,bars:i-entryI});
+    pos=0;units=0;
+  }
+  let peak=c.capital;
+  for(let i=0;i<n;i++){
+    if(i>warm&&pend!==pos){
+      if(pos!==0)close(d.o[i],i,"signal");
+      if(pend!==0&&eq>0)open(pend,d.o[i],i);
+    }
+    if(pos!==0){
+      let stopP=null,stopWhy="",tpP=null;
+      const slF=c.sl>0?c.sl/100:null,liqF=lev>1?0.9/lev:null;
+      if(pos===1){
+        if(slF)stopP=entry*(1-slF),stopWhy="stop";
+        if(liqF&&(stopP===null||entry*(1-liqF)>stopP))stopP=entry*(1-liqF),stopWhy="liquidated";
+        if(c.tp>0)tpP=entry*(1+c.tp/100);
+        if(stopP!==null&&d.l[i]<=stopP){blocked=1;close(Math.min(stopP,d.o[i]),i,stopWhy);if(stopWhy==="liquidated"){eq=Math.max(0,eq)}}
+        else if(tpP!==null&&d.h[i]>=tpP){blocked=1;close(Math.max(tpP,d.o[i]),i,"target")}
+      }else{
+        if(slF)stopP=entry*(1+slF),stopWhy="stop";
+        if(liqF&&(stopP===null||entry*(1+liqF)<stopP))stopP=entry*(1+liqF),stopWhy="liquidated";
+        if(c.tp>0)tpP=entry*(1-c.tp/100);
+        if(stopP!==null&&d.h[i]>=stopP){blocked=-1;close(Math.max(stopP,d.o[i]),i,stopWhy)}
+        else if(tpP!==null&&d.l[i]<=tpP){blocked=-1;close(Math.min(tpP,d.o[i]),i,"target")}
+      }
+    }
+    if(pos!==0)inBars++;
+    const mtm=pos!==0?eq+pos*units*(d.c[i]-entry):eq;
+    curve[i]=i<warm?c.capital:mtm;
+    if(i>=warm){if(curve[i]>peak)peak=curve[i];dd[i]=peak>0?curve[i]/peak-1:0}
+    if(i>=warm){
+      let t=dirs[i];
+      if(c.dirMode==="long"&&t===-1)t=0;
+      if(c.dirMode==="short"&&t===1)t=0;
+      if(blocked!==0){if(t===blocked)t=0;else blocked=0}
+      pend=t;
+    }
+  }
+  if(pos!==0){const p=pos;const last=n-1;close(d.c[last],last,"open");trades[trades.length-1].open=true;curve[last]=eq}
+  const bh=d.c.map((v,i)=>i<warm?c.capital:c.capital*v/d.c[warm]);
+  // stats
+  const wins=trades.filter(x=>x.pnl>0),losses=trades.filter(x=>x.pnl<=0);
+  const gw=wins.reduce((a,x)=>a+x.pnl,0),gl=-losses.reduce((a,x)=>a+x.pnl,0);
+  const rets=[];for(let i=warm+1;i<n;i++)rets.push(curve[i]/curve[i-1]-1);
+  const mean=rets.reduce((a,b)=>a+b,0)/Math.max(1,rets.length);
+  const sd=Math.sqrt(rets.reduce((a,b)=>a+(b-mean)**2,0)/Math.max(1,rets.length));
+  const bpy=525600/tfmin;
+  return{n,warm,curve,bh,dd,trades,fees,
+    net:(curve[n-1]/c.capital-1)*100,final:curve[n-1],
+    bhNet:(bh[n-1]/c.capital-1)*100,
+    maxdd:Math.min(...dd.slice(warm))*100,
+    win:trades.length?wins.length/trades.length*100:0,
+    pf:gl>0?gw/gl:(gw>0?Infinity:0),
+    avgW:wins.length?wins.reduce((a,x)=>a+x.ret,0)/wins.length:0,
+    avgL:losses.length?losses.reduce((a,x)=>a+x.ret,0)/losses.length:0,
+    exp:trades.length?trades.reduce((a,x)=>a+x.ret,0)/trades.length:0,
+    longs:trades.filter(x=>x.dir===1).length,shorts:trades.filter(x=>x.dir===-1).length,
+    sharpe:sd>0?mean/sd*Math.sqrt(bpy):0,
+    expo:(n-warm)>0?inBars/(n-warm)*100:0,
+    maxdd_bh:(()=>{let pk=0,m=0;for(let i=warm;i<n;i++){pk=Math.max(pk,d.c[i]);m=Math.min(m,d.c[i]/pk-1)}return m*100})()};
+}
+
+/* ---------- ui helpers ---------- */
+const fp=(x,dp=1)=>(x>=0?"+":"")+x.toFixed(dp)+"%";
+const fm=x=>"$"+x.toLocaleString(undefined,{maximumFractionDigits:0});
+const fd=(t,intraday)=>{const s=new Date(t).toISOString();return intraday?s.slice(2,10)+" "+s.slice(11,16):s.slice(0,10)};
+function setStatus(m,err){const s=$("#status");s.textContent=m||"";s.className="status"+(err?" err":"")}
+function readCfg(){
+  const g=id=>parseFloat($("#"+id).value);
+  const c=S.cfg;
+  c.dirMode=$("#dirMode").value;
+  for(const k of ["capital","size","lev","fee","slip","sl","tp"]){const v=g(k);c[k]=isNaN(v)?DEF.cfg[k]:v}
+  c.capital=Math.max(1,c.capital);
+}
+function writeCfg(){const c=S.cfg;$("#dirMode").value=c.dirMode;for(const k of ["capital","size","lev","fee","slip","sl","tp"])$("#"+k).value=c[k]}
+function paramsFor(id){
+  const def=STRATS[id],cur=S.params[id]||(S.params[id]={}),out={};
+  for(const p of def.params){let v=cur[p.k];if(v===undefined||v===""||(p.t!=="sel"&&isNaN(+v)))v=p.v;out[p.k]=p.t==="sel"?String(v):+v}
+  return out;
+}
+function buildParams(){
+  const def=STRATS[S.strat],cur=paramsFor(S.strat),box=$("#params");box.innerHTML="";
+  for(const p of def.params){
+    const wrap=document.createElement("div");
+    const id="p_"+p.k;
+    if(p.t==="sel"){
+      wrap.innerHTML=`<label for="${id}">${p.l}</label><select id="${id}">${p.o.map(o=>`<option value="${o[0]}"${String(cur[p.k])===o[0]?" selected":""}>${o[1]}</option>`).join("")}</select>`;
+    }else{
+      wrap.innerHTML=`<label for="${id}">${p.l}</label><input id="${id}" type="number" inputmode="decimal" step="${p.step||1}" min="0" value="${cur[p.k]}">`;
+    }
+    box.appendChild(wrap);
+    wrap.querySelector("#"+id).addEventListener("input",()=>{readParams();scheduleRun()});
+  }
+  $("#stratHint").textContent=def.hint;
+  summaries();
+}
+function readParams(){
+  const def=STRATS[S.strat],cur=S.params[S.strat]||(S.params[S.strat]={});
+  for(const p of def.params){const el=$("#p_"+p.k);if(!el)continue;cur[p.k]=p.t==="sel"?el.value:(el.value===""?"":+el.value)}
+  save();summaries();
+}
+function tfLabel(){return TFS.find(t=>t[1]===S.tf)[0]}
+function summaries(){
+  $("#sumMarket").textContent=S.sym.replace("USDT","")+" · "+tfLabel();
+  $("#sumStrat").textContent=STRATS[S.strat].name;
+  const c=S.cfg;$("#sumRules").textContent=`${c.fee}% fee · ${c.lev}x`;
+}
+let timer=null;
+function scheduleRun(){clearTimeout(timer);timer=setTimeout(()=>{if(DATA)run()},350)}
+
+/* ---------- run ---------- */
+function runOne(id,warmOverride){
+  const p=paramsFor(id),def=STRATS[id];
+  const dirs=def.run(DATA,p);
+  const warm=warmOverride||def.warm(p);
+  return backtest(DATA,dirs,warm,S.cfg,TFMIN[S.tf]);
+}
+function run(){
+  if(!DATA)return;
+  readCfg();save();summaries();
+  const warm=STRATS[S.strat].warm(paramsFor(S.strat));
+  if(DATA.c.length<warm+30){setStatus("Not enough candles for these settings. Load more candles or shorten the indicator lengths.",true);return}
+  RES=runOne(S.strat);RES.intraday=TFMIN[S.tf]<1440;
+  setStatus("");render();
+}
+function render(){
+  const r=RES;$("#out").hidden=false;
+  const big=$("#net");big.textContent=fp(r.net);big.className="big "+(r.net>=0?"pos":"neg");
+  $("#netMeta").textContent=`${fm(S.cfg.capital)} became ${fm(r.final)} · buy and hold over the same period: ${fp(r.bhNet)}`;
+  const st=[
+    ["Win rate",r.win.toFixed(1)+"%",""],
+    ["Profit factor",isFinite(r.pf)?r.pf.toFixed(2):"∞",r.pf>=1?"pos":"neg"],
+    ["Max drawdown",r.maxdd.toFixed(1)+"%","neg"],
+    ["Buy and hold drawdown",r.maxdd_bh.toFixed(1)+"%",""],
+    ["Trades",`${r.trades.length} (${r.longs}L / ${r.shorts}S)`,""],
+    ["Average win / loss",`${fp(r.avgW)} / ${fp(r.avgL)}`,""],
+    ["Expectancy per trade",fp(r.exp,2),r.exp>=0?"pos":"neg"],
+    ["Fees paid",fm(r.fees)+` (${(r.fees/S.cfg.capital*100).toFixed(0)}% of capital)`,""],
+    ["Sharpe ratio",r.sharpe.toFixed(2),""],
+    ["Time in market",r.expo.toFixed(0)+"%",""],
+    ["Average trade length",r.trades.length?fmtDur(r.trades.reduce((a,x)=>a+x.bars,0)/r.trades.length):"–",""],
+    ["Candles tested",(r.n-r.warm).toLocaleString(),""]
+  ];
+  $("#stats").innerHTML=st.map(s=>`<div class="stat"><b class="${s[2]}">${s[1]}</b><span>${s[0]}</span></div>`).join("");
+  drawChart(r);renderTrades();
+}
+function fmtDur(bars){const m=bars*TFMIN[S.tf];return m>=1440?(m/1440).toFixed(1)+" days":(m/60).toFixed(1)+" hours"}
+function renderTrades(){
+  const r=RES,all=r.trades.slice().reverse(),list=showAll?all:all.slice(0,40);
+  $("#tcount").textContent=`(${all.length})`;
+  $("#trades").innerHTML=`<tr><th>Entered</th><th>Side</th><th>Entry</th><th>Exit</th><th>Result</th><th>Ended by</th></tr>`+
+    list.map(t=>`<tr><td>${fd(t.t0,r.intraday)}</td><td><span class="badge ${t.dir===1?"L":"S"}">${t.dir===1?"Long":"Short"}</span></td><td>${t.p0.toPrecision(6)}</td><td>${t.p1.toPrecision(6)}</td><td class="${t.pnl>=0?"pos":"neg"}">${fp(t.ret)}</td><td>${t.open?"still open":t.reason}</td></tr>`).join("");
+  $("#more").hidden=showAll||all.length<=40;
+}
+
+/* ---------- chart ---------- */
+function drawChart(r,hover){
+  const cv=$("#chart"),ctx=cv.getContext("2d"),dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  if(cv.width!==Math.round(W*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  const pad={l:46,r:6,t:8,b:18},ddH=46,w0=r.warm,n=r.n,gap=10;
+  const top=pad.t,bot=H-pad.b-ddH-gap,ddTop=H-pad.b-ddH;
+  const log=$("#log").checked,f=v=>log?Math.log(Math.max(v,1e-9)):v;
+  let mn=Infinity,mx=-Infinity;
+  for(let i=w0;i<n;i++){mn=Math.min(mn,r.curve[i],r.bh[i]);mx=Math.max(mx,r.curve[i],r.bh[i])}
+  if(mx===mn)mx=mn*1.01;
+  const X=i=>pad.l+(i-w0)/Math.max(1,n-1-w0)*(W-pad.l-pad.r);
+  const Y=v=>bot-(f(v)-f(mn))/(f(mx)-f(mn))*(bot-top);
+  ctx.font="11px Manrope, system-ui, sans-serif";ctx.fillStyle="#8B9BAD";ctx.strokeStyle="#263749";ctx.lineWidth=1;
+  for(let g=0;g<=3;g++){
+    const fv=f(mn)+(f(mx)-f(mn))*g/3,v=log?Math.exp(fv):fv,y=bot-(bot-top)*g/3;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.textAlign="right";ctx.fillText(v>=10000?(v/1000).toFixed(0)+"k":v.toFixed(0),pad.l-6,y+4);
+  }
+  const path=(arr,color,wd,dash)=>{ctx.beginPath();ctx.setLineDash(dash||[]);ctx.strokeStyle=color;ctx.lineWidth=wd;
+    for(let i=w0;i<n;i++){const x=X(i),y=Y(arr[i]);i===w0?ctx.moveTo(x,y):ctx.lineTo(x,y)}ctx.stroke();ctx.setLineDash([])};
+  path(r.bh,"#6F8398",1.5,[5,4]);
+  path(r.curve,"#F0B54A",2.2);
+  // drawdown strip
+  const dmin=Math.min(-0.01,Math.min(...r.dd.slice(w0)));
+  ctx.beginPath();ctx.moveTo(X(w0),ddTop);
+  for(let i=w0;i<n;i++)ctx.lineTo(X(i),ddTop+(r.dd[i]/dmin)*ddH);
+  ctx.lineTo(X(n-1),ddTop);ctx.closePath();ctx.fillStyle="rgba(232,100,79,.45)";ctx.fill();
+  ctx.fillStyle="#8B9BAD";ctx.textAlign="right";ctx.fillText((dmin*100).toFixed(0)+"%",pad.l-6,ddTop+ddH);
+  ctx.textAlign="left";ctx.fillText(fd(DATA.t[w0],false),pad.l,H-4);
+  ctx.textAlign="right";ctx.fillText(fd(DATA.t[n-1],false),W-pad.r,H-4);
+  if(hover!=null){
+    const x=X(hover);ctx.strokeStyle="#E7ECF2";ctx.globalAlpha=.4;ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,H-pad.b);ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle="#F0B54A";ctx.beginPath();ctx.arc(x,Y(r.curve[hover]),4,0,7);ctx.fill();
+  }
+  drawChart.geo={pad,W,w0,n};
+}
+(function(){
+  const cv=$("#chart"),tip=$("#tip");
+  function move(e){
+    if(!RES||!drawChart.geo)return;
+    const {pad,W,w0,n}=drawChart.geo,rect=cv.getBoundingClientRect(),x=e.clientX-rect.left;
+    let i=Math.round(w0+(x-pad.l)/(W-pad.l-pad.r)*(n-1-w0));i=Math.max(w0,Math.min(n-1,i));
+    drawChart(RES,i);
+    tip.style.display="block";
+    tip.innerHTML=`${fd(DATA.t[i],true)}<br>Strategy <b>${fm(RES.curve[i])}</b> · Hold <b>${fm(RES.bh[i])}</b> · DD <b>${(RES.dd[i]*100).toFixed(1)}%</b>`;
+  }
+  cv.addEventListener("pointermove",move);cv.addEventListener("pointerdown",move);
+  cv.addEventListener("pointerleave",()=>{tip.style.display="none";if(RES)drawChart(RES)});
+  window.addEventListener("resize",()=>{if(RES)drawChart(RES)});
+  $("#log").addEventListener("change",()=>{if(RES)drawChart(RES)});
+})();
+
+/* ---------- compare ---------- */
+let CMP=[],cmpAll=false;
+function compare(){
+  if(!DATA){setStatus("Load candles first.",true);return}
+  readCfg();save();
+  const ids=Object.keys(STRATS);
+  const warm=Math.max(...ids.map(id=>STRATS[id].warm(paramsFor(id))));
+  if(DATA.c.length<warm+30){setStatus("Not enough candles to compare. Load more candles.",true);return}
+  setStatus(`Testing ${ids.length} strategies…`);
+  setTimeout(()=>{
+    CMP=ids.map(id=>({id,r:runOne(id,warm)})).sort((a,b)=>b.r.net-a.r.net);
+    CMP.warm=warm;cmpAll=false;setStatus("");renderCmp();
+    $("#cmpBox").hidden=false;$("#cmpBox").scrollIntoView({behavior:"smooth"});
+  },30);
+}
+function renderCmp(){
+  const rows=cmpAll?CMP:CMP.slice(0,15),bh=CMP[0].r;
+  $("#cmpTitle").textContent=`Strategy comparison (${CMP.length})`;
+  $("#cmp").innerHTML=`<tr><th>Strategy</th><th>Net</th><th>Max DD</th><th>Win rate</th><th>Profit factor</th><th>Trades</th><th>Fees</th></tr>`+
+    rows.map((x,i)=>`<tr class="click" data-id="${x.id}"><td>${i+1}. ${STRATS[x.id].name}</td><td class="${x.r.net>=0?"pos":"neg"}">${fp(x.r.net)}</td><td>${x.r.maxdd.toFixed(1)}%</td><td>${x.r.win.toFixed(0)}%</td><td>${isFinite(x.r.pf)?x.r.pf.toFixed(2):"∞"}</td><td>${x.r.trades.length}</td><td>${fm(x.r.fees)}</td></tr>`).join("")+
+    `<tr><td>Buy and hold</td><td class="${bh.bhNet>=0?"pos":"neg"}">${fp(bh.bhNet)}</td><td>${bh.maxdd_bh.toFixed(1)}%</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>`;
+  $("#cmpHint").textContent=`Every strategy uses its current settings, your direction mode, fees and stops, and starts on the same candle (${fd(DATA.t[CMP.warm],false)}). Tap a row to open it. A winner on one symbol and timeframe is often luck, so check it on others before trusting it.`;
+  $("#cmpMore").hidden=cmpAll||CMP.length<=15;
+  $("#cmp").querySelectorAll("tr.click").forEach(tr=>tr.addEventListener("click",()=>{S.strat=tr.dataset.id;$("#strat").value=S.strat;buildParams();save();run();$("#out").scrollIntoView({behavior:"smooth"})}));
+}
+
+/* ---------- load ---------- */
+async function load(){
+  if(busy)return;busy=true;
+  const count=+S.bars;
+  try{
+    setStatus("Loading candles…");
+    const rows=await loadCandles(S.sym,S.tf,count);
+    if(rows.length<100)throw new Error("Bybit returned too few candles for this symbol and timeframe.");
+    DATA=toData(rows);
+    const days=(DATA.t[DATA.t.length-1]-DATA.t[0])/86400000;
+    $("#span").textContent=`${rows.length.toLocaleString()} candles · ${fd(DATA.t[0],false)} to ${fd(DATA.t[rows.length-1],false)} (${days>=730?(days/365).toFixed(1)+" years":Math.round(days)+" days"})`;
+    busy=false;run();
+  }catch(e){
+    busy=false;setStatus("Could not load candles: "+(e.message||e)+". Check your connection and tap Reload candles.",true);
+  }
+}
+
+/* ---------- init ---------- */
+(function init(){
+  $("#sym").innerHTML=SYMS.map(s=>`<option value="${s}">${s.replace("USDT","")}/USDT</option>`).join("");
+  $("#sym").value=S.sym;$("#bars").value=S.bars;
+  const order=["Moving averages","Trend and breakout","Momentum and volume","Reversal","Filtered combos"];
+  $("#strat").innerHTML=order.map(cat=>`<optgroup label="${cat}">`+Object.keys(STRATS).filter(k=>STRATS[k].cat===cat).map(k=>`<option value="${k}">${STRATS[k].name}</option>`).join("")+`</optgroup>`).join("");
+  if(!STRATS[S.strat])S.strat="ema2";
+  $("#strat").value=S.strat;
+  const tf=$("#tfs");
+  tf.innerHTML=TFS.map(t=>`<button class="pill" data-tf="${t[1]}" aria-pressed="${t[1]===S.tf}">${t[0]}</button>`).join("");
+  tf.addEventListener("click",e=>{const b=e.target.closest(".pill");if(!b)return;S.tf=b.dataset.tf;tf.querySelectorAll(".pill").forEach(x=>x.setAttribute("aria-pressed",x===b));save();summaries();load()});
+  $("#sym").addEventListener("change",e=>{S.sym=e.target.value;save();summaries();load()});
+  $("#bars").addEventListener("change",e=>{S.bars=e.target.value;save();load()});
+  $("#reload").addEventListener("click",()=>{delete CACHE[S.sym+"|"+S.tf];load()});
+  $("#strat").addEventListener("change",e=>{S.strat=e.target.value;save();buildParams();if(DATA)run()});
+  for(const id of ["dirMode","capital","size","lev","fee","slip","sl","tp"])$("#"+id).addEventListener("input",()=>{readCfg();save();summaries();scheduleRun()});
+  document.querySelectorAll("[data-fee]").forEach(b=>b.addEventListener("click",()=>{$("#fee").value=b.dataset.fee;readCfg();save();summaries();if(DATA)run()}));
+  $("#run").addEventListener("click",()=>{DATA?run():load()});
+  $("#compare").addEventListener("click",compare);
+  $("#more").addEventListener("click",()=>{showAll=true;renderTrades()});
+  $("#cmpMore").addEventListener("click",()=>{cmpAll=true;renderCmp()});
+  writeCfg();buildParams();summaries();load();
+})();
+</script>
+</body>
+</html>
