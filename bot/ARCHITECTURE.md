@@ -22,7 +22,7 @@ every closed 15m candle            ▼
                                                        │ pass
                                        notional > $2,500? ── yes ──▶ Telegram approve/deny (5 min)
                                                        │
-                                     broker: testnet orders  +  shadow fills vs mainnet book
+                                     broker: demo-account orders + shadow fills vs mainnet book
                                                        │
                                                journal (SQLite) ──▶ dashboard (SSE), daily report, calibration
 ```
@@ -82,7 +82,7 @@ bot/
       killswitch.py      # flatten + cancel + HALTED; triggers: drawdown, /kill, button, HALT file, 3 errors/10 min
     execution/
       broker.py          # Broker protocol
-      bybit.py           # pybit v5 HTTP + private WS (testnet now; mainnet only behind live unlock)
+      bybit.py           # pybit v5 HTTP + private WS (demo=True now; mainnet only behind live unlock)
       shadow.py          # simulated fill against the mainnet book at decision time
       reconcile.py
     engine.py            # live loop: on candle close -> ... (diagram above)
@@ -140,7 +140,7 @@ Up to 3 candidates per run. After Opus finishes, `gates.py` evaluates the **fina
 
 ## 7. Paper mode (decided in spec §10)
 
-`broker = Composite(testnet_orders, shadow_fills)`. Every intent goes to the Bybit testnet, to exercise order placement, attached SL/TP, cancels, reduce-only and the kill switch. In parallel, `shadow.py` simulates the fill by walking the **mainnet** `orderbook.50` snapshot taken at send time. The P&L compared to the backtest is the **shadow** P&L. Testnet fills are logged too, but only to check the plumbing.
+`broker = Composite(demo_orders, shadow_fills)`. Every intent goes to the bot's Bybit **Demo Trading** sub-account (`pybit ... demo=True`), to exercise order placement, attached SL/TP, cancels, reduce-only and the kill switch. In parallel, `shadow.py` simulates the fill by walking the **mainnet** `orderbook.50` snapshot taken at send time. The P&L compared to the backtest is the **shadow** P&L. Demo fills are logged too, and both are compared on the dashboard.
 
 ## 8. Live mode is locked
 
@@ -148,7 +148,7 @@ Up to 3 candidates per run. After Opus finishes, `gates.py` evaluates the **fina
 
 ## 9. Secrets and security
 
-- `.env` holds `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `BYBIT_TESTNET_KEY`/`_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `DASHBOARD_USER`/`_PASS`. It's git-ignored, set to `chmod 600`, and loaded as `SecretStr`.
+- `.env` holds `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY`, `BYBIT_DEMO_KEY`/`_SECRET` (a demo API key created on the bot's sub-account), `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `DASHBOARD_USER`/`_PASS`. It's git-ignored, set to `chmod 600`, and loaded as `SecretStr`.
 - A logging filter redacts every secret value. A test fails if any secret appears in logs or the journal.
 - On startup, the engine checks the key's permissions through the Bybit API (`/v5/user/query-api`) and **refuses to start** if withdrawals are enabled.
 - The dashboard binds to `127.0.0.1` and is reached through Tailscale, with basic auth. Telegram only accepts commands from your chat ID, and only the fixed command set is parsed.
@@ -159,7 +159,7 @@ Up to 3 candidates per run. After Opus finishes, `gates.py` evaluates the **fina
 - **Property tests:** the guard never passes an intent that breaks any limit, for random intents and account states. Sizing is never above `f_max` and is 0 below the cutoff.
 - **Leakage tests:** see §4.
 - **Equivalence:** the backtest engine and the live engine produce identical intents when fed the same recorded candles and a fake Jev.
-- **Integration (needs keys, run manually or on the Mac Mini):** testnet order round-trip, attached SL/TP, the kill switch flattening a real testnet position, reconcile after a forced restart.
+- **Integration (needs keys, run manually or on the Mac Mini):** demo-account order round-trip, attached SL/TP, the kill switch flattening a real demo position, reconcile after a forced restart.
 - **Improvement-loop guardrail test:** a candidate that edits `risk.yaml` or adds a risk-related key is rejected.
 
 ## 11. What's deliberately simple in v1

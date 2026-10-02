@@ -14,7 +14,7 @@ Status: **DRAFT, needs your approval before any code is written.** It implements
 | Needs | Here (cloud session) | Mac Mini |
 |---|---|---|
 | History from Bybit's public archive (`public.bybit.com`) | ✅ reachable, about 70 MB/s | ✅ |
-| Bybit API: REST, WS, testnet orders, funding history | ❌ **geo-blocked** (this server is in the US) | ✅ **if Bybit is allowed in your country** |
+| Bybit API: REST, WS, demo-account orders, funding history | ❌ **geo-blocked** (this server is in the US) | ✅ (confirmed: you already trade on Bybit demo) |
 | Jev | ✅ once `TYPESAFE_API_KEY` is added to the cloud environment settings | ✅ via `.env` |
 | Telegram, Opus | ✅ | ✅ |
 
@@ -70,14 +70,14 @@ Writes `reports/backtest_<id>.md`. **If it passes, it also writes `active/strate
 **⏸ CHECKPOINT: I'll report the numbers to you before building any live components.** If the hypothesis fails the gates, you decide: refine it (every change counts as a trial), try a different idea, or stop. I won't adjust anything to force a pass.
 
 ### M8 Execution (about 1.5 days; integration tests run on the Mac Mini)
-`broker.py`, `bybit.py` (pybit v5, testnet, position-level SL/TP), `shadow.py` (walk the mainnet book), `reconcile.py`, and the startup check that the API key can't withdraw.
+`broker.py`, `bybit.py` (pybit v5, `demo=True`, position-level SL/TP), `shadow.py` (walk the mainnet book), `reconcile.py`, and the startup check that the API key can't withdraw.
 Tests first, with recorded fixtures:
 - Order-building correctness.
 - Reduce-only on exits.
 - Price band ±1%.
 - Reconcile treating the exchange as correct.
 - Shadow fills across book levels.
-Marked `integration`: testnet round trip and the kill switch flattening a real testnet position.
+Marked `integration`: demo-account round trip and the kill switch flattening a real demo position.
 
 ### M9 Live engine and journal (about 1 day)
 `engine.py`, `journal.py`, `live_feed.py` (WS aggregation shared with M1).
@@ -113,6 +113,6 @@ Final review of the whole diff, then a PR, opened only once you ask for it.
 
 ## What I need from you
 
-1. **Is Bybit allowed where you live and where the Mac Mini is?** Bybit blocks some countries outright, and it blocked this cloud server for that reason. If you're in a restricted country, the venue has to change before M8. A change like that goes back through the spec.
+1. ~~Is Bybit allowed where you are?~~ **Answered: yes. You trade on Bybit Demo now.** Venue switched from testnet to Demo Trading. **Before M8:** create a sub-account for the bot, turn on Demo Trading for it, and create a trade-only demo API key there. Don't share the demo account you trade by hand.
 2. **Add `TYPESAFE_API_KEY` to this cloud environment's settings** (environment menu in the session title bar → Edit) before M7. It's picked up in a new session. M0–M6 don't need it.
 3. **Approve this plan.** Then I start M0.

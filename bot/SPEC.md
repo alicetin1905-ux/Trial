@@ -7,7 +7,7 @@ Harness: the same six phases AgenKit uses (brainstorm, architecture, plan, test-
 
 | Blank in the prompt | Decision |
 |---|---|
-| Venue | Bybit testnet for orders, Bybit mainnet public data for signals (see §10) |
+| Venue | **Bybit Demo Trading** for orders (`api-demo.bybit.com`, on a dedicated sub-account), Bybit mainnet public data for signals (see §10) |
 | Asset | BTCUSDT linear perpetual |
 | Strategy idea | Trend + pullback, with Jev filtering regime and setup quality |
 | Deploy target | Mac Mini, launchd `KeepAlive`, sleep disabled |
@@ -83,7 +83,7 @@ Jev is calibrated on its own answers ("is the regime trending?"). That doesn't m
 2. `p_win = calibrator(edge_score)`. The calibrator is isotonic or Platt, fitted on in-sample walk-forward folds only and frozen for out-of-sample.
 3. A trade fires only if **every** per-question threshold passes **and** `p_win ≥ p_cutoff`.
 
-Calibration is measured per question (Brier score and reliability curve, 10 bins) and for `p_win`, first on backtest out-of-sample, then on **our own testnet/shadow fills**. If a curve bends (ECE above 0.05), a recalibration map is applied in code and versioned.
+Calibration is measured per question (Brier score and reliability curve, 10 bins) and for `p_win`, first on backtest out-of-sample, then on **our own demo/shadow fills**. If a curve bends (ECE above 0.05), a recalibration map is applied in code and versioned.
 
 ## 7. Sizing
 
@@ -107,7 +107,7 @@ Calibration is measured per question (Brier score and reliability curve, 10 bins
 | Funding veto | No entry within 10 min of funding settlement |
 | Order sanity | Reduce-only on exits, price band ±1% from mid, max 3 order attempts per minute |
 
-**Kill switch:** cancel all open orders, close the position with reduce-only market orders, write `HALTED` to disk, alert Telegram, and refuse every order until you reset it by hand. It can be triggered by the drawdown rule, the `/kill` command, the dashboard button, the `HALT` file, or 3 order errors in 10 minutes. A test fires it against testnet.
+**Kill switch:** cancel all open orders, close the position with reduce-only market orders, write `HALTED` to disk, alert Telegram, and refuse every order until you reset it by hand. It can be triggered by the drawdown rule, the `/kill` command, the dashboard button, the `HALT` file, or 3 order errors in 10 minutes. A test fires it against the demo account.
 
 **Keys:** Bybit API key has trade permission only, withdrawals off, and is IP-whitelisted to the Mac Mini. All secrets live in `.env` (git-ignored), are loaded once, and are masked in logs. A test greps the logs for secret values. The bot never asks for or stores passwords or 2FA codes.
 
@@ -124,10 +124,11 @@ Calibration is measured per question (Brier score and reliability curve, 10 bins
 
 ## 10. Paper mode
 
-Bybit testnet has its own thin, synthetic order book, so testnet fills say nothing about real slippage. The design is:
+Paper trading runs on **Bybit Demo Trading** (you already use it), not testnet. Demo prices track the real mainnet market, while testnet has its own thin, synthetic book. Demo fills are still simulated, though, so we don't rely on them alone for slippage. The design is:
 
 - **Signals** come from mainnet public market data, so they match the backtest.
-- **Orders** go to testnet, to prove the order, cancel, reduce-only and kill-switch plumbing works.
+- **Orders** go to the demo account, to prove the order, cancel, reduce-only and kill-switch plumbing works, and to give a second P&L to compare.
+- **The bot gets its own sub-account with Demo Trading enabled.** It must not share the demo account you trade by hand. Reconcile would see your manual positions and block entries, and the kill switch would close **your** positions.
 - **Shadow fills** are simulated against the mainnet book at decision time. Shadow P&L is the number compared to the backtest.
 
 To move paper → live, you need **all** of: ≥ 60 days and ≥ 50 trades on paper; paper Sharpe, hit rate and average trade inside the backtest's 90% bootstrap band; slippage on our fills within 1.5× the modelled slippage; calibration passing on our own fills; the kill switch having fired once in testing; and every answer in §17 clean. Even then, the bot doesn't switch itself to live. That's a separate config flag that you flip.
@@ -167,7 +168,7 @@ Python 3.12, `pybit` (Bybit v5), `typesafe-sdk` (Jev), `anthropic`, pandas/numpy
 
 Does paper match the backtest? Did the kill switch fire in testing? Is any hard limit delegated to a model instead of code? Is Jev's confidence calibrated on our own fills? What market regime would break this? Then a section titled **"WHAT COULD BLOW UP THIS ACCOUNT?"** The bot refuses to go live until every answer is clean.
 
-Already on that list: exchange outage while in a position, a gap through the stop, a Jev outage or model version change (we pin the model version and alert on change), testnet behaving differently from mainnet, too few out-of-sample trades, and the weekly loop overfitting.
+Already on that list: exchange outage while in a position, a gap through the stop, a Jev outage or model version change (we pin the model version and alert on change), demo fills behaving differently from mainnet, too few out-of-sample trades, and the weekly loop overfitting.
 
 ## 18. Answers (all resolved)
 
