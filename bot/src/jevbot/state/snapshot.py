@@ -26,6 +26,7 @@ VOL_WINDOW = 288  # 3 days of 15m bars
 SWING_WINDOW = 24  # 6 hours of 15m bars
 # EMA(50) on 4h needs ~500 4h bars before the seed's weight is negligible (<1e-8): 90 days.
 WARMUP_BARS = 90 * 96
+ROUND_DP = 4
 
 FEATURES = (
     "ret_15m_z",
@@ -108,6 +109,9 @@ def compute_features(bars15: pd.DataFrame) -> pd.DataFrame:
     f = f[["t", *FEATURES]]
     f = f.iloc[WARMUP_BARS - 1 :]
     f = f.replace([np.inf, -np.inf], np.nan).dropna()
+    # Rounded HERE (not only in snapshot_at), so the backtest and live compare the exact same
+    # numbers against rule thresholds and send Jev the exact same state.
+    f[list(FEATURES)] = f[list(FEATURES)].round(ROUND_DP)
     return f.reset_index(drop=True)
 
 
@@ -120,4 +124,4 @@ def snapshot_at(bars15: pd.DataFrame, t: int) -> dict[str, float]:
     row = feats[feats["t"] == t]
     if row.empty:
         raise KeyError(f"features undefined at {t} (not enough history)")
-    return {k: round(float(row[k].iloc[0]), 4) for k in FEATURES}
+    return {k: float(row[k].iloc[0]) for k in FEATURES}
