@@ -170,148 +170,293 @@ const TFMIN={"15":15,"30":30,"60":60,"120":120,"240":240,"360":360,"720":720,"D"
 /* ---------- indicators ---------- */
 function ema(a,n){const k=2/(n+1),o=new Array(a.length);let p=a[0];o[0]=p;for(let i=1;i<a.length;i++){p=a[i]*k+p*(1-k);o[i]=p}return o}
 function rma(a,n){const o=new Array(a.length);let p=a[0];o[0]=p;for(let i=1;i<a.length;i++){p=(p*(n-1)+a[i])/n;o[i]=p}return o}
-function atr(d,n){const tr=new Array(d.c.length);tr[0]=d.h[0]-d.l[0];for(let i=1;i<tr.length;i++){const pc=d.c[i-1];tr[i]=Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-pc),Math.abs(d.l[i]-pc))}return rma(tr,n)}
+function trArr(d){const tr=new Array(d.c.length);tr[0]=d.h[0]-d.l[0];for(let i=1;i<tr.length;i++){const pc=d.c[i-1];tr[i]=Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-pc),Math.abs(d.l[i]-pc))}return tr}
+const atr=(d,n)=>rma(trArr(d),n);
 function rsi(c,n){const g=[0],l=[0];for(let i=1;i<c.length;i++){const x=c[i]-c[i-1];g.push(Math.max(x,0));l.push(Math.max(-x,0))}const ag=rma(g,n),al=rma(l,n);return ag.map((v,i)=>al[i]===0?100:100-100/(1+v/al[i]))}
 
-/* ---------- strategies: return desired position per bar close (1, -1, 0) ---------- */
-const STRATS={
-  ema2:{name:"EMA cross (2 lines)",
-    hint:"Long while the fast EMA is above the slow EMA, short while below. 50/200 is the classic golden/death cross.",
-    params:[{k:"fast",l:"Fast EMA",v:50},{k:"slow",l:"Slow EMA",v:200}],
-    warm:p=>Math.max(p.fast,p.slow)*2,
-    run(d,p){const f=ema(d.c,p.fast),s=ema(d.c,p.slow);return d.c.map((_,i)=>f[i]>s[i]?1:f[i]<s[i]?-1:0)}},
-  ema3:{name:"Triple EMA cross",
-    hint:"Long when fast > mid > slow, short when fast < mid < slow. Mixed order means the trend is unclear.",
-    params:[{k:"fast",l:"Fast EMA",v:8},{k:"mid",l:"Mid EMA",v:21},{k:"slow",l:"Slow EMA",v:55},
-      {k:"mode",l:"When not aligned",t:"sel",v:"flat",o:[["flat","Go flat"],["hold","Hold until opposite alignment"]]}],
-    warm:p=>Math.max(p.fast,p.mid,p.slow)*2,
-    run(d,p){const f=ema(d.c,p.fast),m=ema(d.c,p.mid),s=ema(d.c,p.slow);let prev=0;
-      return d.c.map((_,i)=>{let x=f[i]>m[i]&&m[i]>s[i]?1:f[i]<m[i]&&m[i]<s[i]?-1:(p.mode==="hold"?prev:0);prev=x;return x})}},
-  ce:{name:"Chandelier Exit",
-    hint:"A trailing ATR stop that flips the trade direction when price closes through it. Default is ATR period 4, multiplier 2.",
-    params:[{k:"period",l:"ATR period",v:4},{k:"mult",l:"Multiplier",v:2,step:.1},
-      {k:"useClose",l:"Highest/lowest of",t:"sel",v:"1",o:[["1","Closes"],["0","Highs and lows"]]}],
-    warm:p=>Math.max(p.period,2)*4,
-    run(d,p){const n=d.c.length,A=atr(d,p.period),out=new Array(n).fill(0);let lsP=0,ssP=0,dir=1;
-      for(let i=0;i<n;i++){
-        let hh=-Infinity,ll=Infinity;const from=Math.max(0,i-p.period+1);
-        for(let j=from;j<=i;j++){const hv=p.useClose==="1"?d.c[j]:d.h[j],lv=p.useClose==="1"?d.c[j]:d.l[j];if(hv>hh)hh=hv;if(lv<ll)ll=lv}
-        let ls=hh-p.mult*A[i],ss=ll+p.mult*A[i];
-        if(i>0){if(d.c[i-1]>lsP)ls=Math.max(ls,lsP);if(d.c[i-1]<ssP)ss=Math.min(ss,ssP);
-          if(d.c[i]>ssP)dir=1;else if(d.c[i]<lsP)dir=-1}
-        out[i]=dir;lsP=ls;ssP=ss}
-      return out}},
-  macd:{name:"MACD signal cross",
-    hint:"Long while the MACD line is above its signal line, short while below.",
-    params:[{k:"fast",l:"Fast EMA",v:12},{k:"slow",l:"Slow EMA",v:26},{k:"sig",l:"Signal",v:9}],
-    warm:p=>Math.max(p.fast,p.slow)*3,
-    run(d,p){const a=ema(d.c,p.fast),b=ema(d.c,p.slow),m=a.map((v,i)=>v-b[i]),s=ema(m,p.sig);return m.map((v,i)=>v>s[i]?1:v<s[i]?-1:0)}},
-  rsi:{name:"RSI reversal",
-    hint:"Long when RSI crosses back above the low level, short when it crosses back below the high level. Optionally exit at 50.",
-    params:[{k:"len",l:"RSI length",v:14},{k:"lo",l:"Low level",v:30},{k:"hi",l:"High level",v:70},
-      {k:"mid",l:"Exit at 50",t:"sel",v:"1",o:[["1","Yes"],["0","No, reverse only"]]}],
-    warm:p=>p.len*4,
-    run(d,p){const r=rsi(d.c,p.len);let pos=0;return r.map((v,i)=>{if(i>0){const q=r[i-1];
-      if(q<p.lo&&v>=p.lo)pos=1;else if(q>p.hi&&v<=p.hi)pos=-1;
-      else if(p.mid==="1"){if(pos===1&&v>=50)pos=0;else if(pos===-1&&v<=50)pos=0}}return pos})}}
-};
-
-/* ---------- extra helpers ---------- */
+/* ---------- helpers ---------- */
 const sgn=x=>x>0?1:x<0?-1:0;
+const sub=(a,b)=>a.map((v,i)=>v-b[i]);
 const sma=(a,n)=>{const o=new Array(a.length);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];o[i]=i>=n-1?s/n:s/(i+1)}return o};
-function wma(a,n){const o=new Array(a.length);for(let i=0;i<a.length;i++){const m=Math.min(n,i+1),dn=m*(m+1)/2;let s=0;for(let j=0;j<m;j++)s+=a[i-j]*(m-j);o[i]=s/dn}return o}
-function hma(a,n){const h=Math.max(1,Math.round(n/2)),q=Math.max(1,Math.round(Math.sqrt(n))),w1=wma(a,h),w2=wma(a,n);return wma(w1.map((v,i)=>2*v-w2[i]),q)}
-function dema(a,n){const e=ema(a,n),e2=ema(e,n);return e.map((v,i)=>2*v-e2[i])}
-function tema(a,n){const e=ema(a,n),e2=ema(e,n),e3=ema(e2,n);return e.map((v,i)=>3*v-3*e2[i]+e3[i])}
-function kama(a,n,f=2,s=30){const o=[a[0]],fa=2/(f+1),sa=2/(s+1);for(let i=1;i<a.length;i++){const j=Math.max(0,i-n);let vol=0;for(let k=j+1;k<=i;k++)vol+=Math.abs(a[k]-a[k-1]);const er=vol===0?0:Math.abs(a[i]-a[j])/vol,sc=(er*(fa-sa)+sa)**2;o.push(o[i-1]+sc*(a[i]-o[i-1]))}return o}
+const rsum=(a,n)=>{const o=new Array(a.length);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];o[i]=s}return o};
+function emaA(a,al){const o=new Array(a.length);let p=a[0];o[0]=p;for(let i=1;i<a.length;i++){p=al*a[i]+(1-al)*p;o[i]=p}return o}
+function wma(a,n){n=Math.max(1,n);const o=new Array(a.length);for(let i=0;i<a.length;i++){const m=Math.min(n,i+1),dn=m*(m+1)/2;let s=0;for(let j=0;j<m;j++)s+=a[i-j]*(m-j);o[i]=s/dn}return o}
 function stdev(a,n){const o=[];for(let i=0;i<a.length;i++){const s=Math.max(0,i-n+1),m=i-s+1;let u=0;for(let j=s;j<=i;j++)u+=a[j];u/=m;let q=0;for(let j=s;j<=i;j++)q+=(a[j]-u)**2;o.push(Math.sqrt(q/m))}return o}
 function hhv(a,n,lag=0){const o=[];for(let i=0;i<a.length;i++){const e=i-lag;if(e<0){o.push(a[i]);continue}let m=-Infinity;for(let j=Math.max(0,e-n+1);j<=e;j++)if(a[j]>m)m=a[j];o.push(m)}return o}
 function llv(a,n,lag=0){const o=[];for(let i=0;i<a.length;i++){const e=i-lag;if(e<0){o.push(a[i]);continue}let m=Infinity;for(let j=Math.max(0,e-n+1);j<=e;j++)if(a[j]<m)m=a[j];o.push(m)}return o}
 function linreg(a,n){const val=[],slope=[];for(let i=0;i<a.length;i++){const m=Math.min(n,i+1);if(m<2){val.push(a[i]);slope.push(0);continue}let sx=0,sy=0,sxy=0,sxx=0;for(let j=0;j<m;j++){const y=a[i-m+1+j];sx+=j;sy+=y;sxy+=j*y;sxx+=j*j}const b=(m*sxy-sx*sy)/(m*sxx-sx*sx),A=(sy-b*sx)/m;val.push(A+b*(m-1));slope.push(b)}return{val,slope}}
-function dmi(d,n){const L=d.c.length,pdm=[0],ndm=[0],tr=[d.h[0]-d.l[0]];for(let i=1;i<L;i++){const up=d.h[i]-d.h[i-1],dn=d.l[i-1]-d.l[i];pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0);tr.push(Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-d.c[i-1]),Math.abs(d.l[i]-d.c[i-1])))}
+function dmi(d,n){const L=d.c.length,pdm=[0],ndm=[0],tr=trArr(d);for(let i=1;i<L;i++){const up=d.h[i]-d.h[i-1],dn=d.l[i-1]-d.l[i];pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0)}
   const a=rma(tr,n),p=rma(pdm,n),m=rma(ndm,n),pdi=p.map((v,i)=>a[i]?100*v/a[i]:0),ndi=m.map((v,i)=>a[i]?100*v/a[i]:0);
   const dx=pdi.map((v,i)=>{const s=v+ndi[i];return s?100*Math.abs(v-ndi[i])/s:0});return{pdi,ndi,adx:rma(dx,n)}}
-function supertrend(d,n,m){const A=atr(d,n),L=d.c.length,dir=new Array(L).fill(1);let fu=0,fl=0;for(let i=0;i<L;i++){const hl=(d.h[i]+d.l[i])/2,bu=hl+m*A[i],bl=hl-m*A[i];if(i===0){fu=bu;fl=bl;continue}const pc=d.c[i-1];fu=(bu<fu||pc>fu)?bu:fu;fl=(bl>fl||pc<fl)?bl:fl;let di=dir[i-1];if(di===1&&d.c[i]<fl)di=-1;else if(di===-1&&d.c[i]>fu)di=1;dir[i]=di}return dir}
-function psar(d,st,mx){const L=d.c.length,dir=new Array(L).fill(1);let up=true,sar=d.l[0],ep=d.h[0],af=st;for(let i=1;i<L;i++){sar=sar+af*(ep-sar);if(up){sar=Math.min(sar,d.l[i-1],i>1?d.l[i-2]:d.l[i-1]);if(d.l[i]<sar){up=false;sar=ep;ep=d.l[i];af=st}else if(d.h[i]>ep){ep=d.h[i];af=Math.min(af+st,mx)}}else{sar=Math.max(sar,d.h[i-1],i>1?d.h[i-2]:d.h[i-1]);if(d.h[i]>sar){up=true;sar=ep;ep=d.h[i];af=st}else if(d.l[i]<ep){ep=d.l[i];af=Math.min(af+st,mx)}}dir[i]=up?1:-1}return dir}
-const typ=d=>d.c.map((c,i)=>(d.h[i]+d.l[i]+c)/3);
-function cciArr(d,n){const tp=typ(d),sm=sma(tp,n);return tp.map((v,i)=>{const s=Math.max(0,i-n+1),m=i-s+1;let md=0;for(let j=s;j<=i;j++)md+=Math.abs(tp[j]-sm[i]);md/=m;return md===0?0:(v-sm[i])/(0.015*md)})}
-function revCross(x,lo,hi,mid,useMid){let pos=0;return x.map((v,i)=>{if(i>0){const q=x[i-1];if(q<lo&&v>=lo)pos=1;else if(q>hi&&v<=hi)pos=-1;else if(useMid){if(pos===1&&v>=mid)pos=0;else if(pos===-1&&v<=mid)pos=0}}return pos})}
+function cci(s,n){const m=sma(s,n);return s.map((v,i)=>{const a=Math.max(0,i-n+1);let md=0;for(let j=a;j<=i;j++)md+=Math.abs(s[j]-m[i]);md/=i-a+1;return md?(v-m[i])/(0.015*md):0})}
+function mfi(s,v,n){const up=s.map((x,i)=>i&&x>s[i-1]?x*v[i]:0),dn=s.map((x,i)=>i&&x<s[i-1]?x*v[i]:0),U=rsum(up,n),D=rsum(dn,n);return U.map((u,i)=>D[i]?100-100/(1+u/D[i]):100)}
 function bands(c,n,k){const m=sma(c,n),s=stdev(c,n);return{m,u:m.map((v,i)=>v+k*s[i]),l:m.map((v,i)=>v-k*s[i])}}
-function chanBreak(c,u,l,m){let pos=0;return c.map((v,i)=>{if(v>u[i])pos=1;else if(v<l[i])pos=-1;else if(pos===1&&v<m[i])pos=0;else if(pos===-1&&v>m[i])pos=0;return pos})}
-function alignDir(lines,mode){let prev=0;return lines[0].map((_,i)=>{let up=true,dn=true;for(let k=0;k<lines.length-1;k++){if(!(lines[k][i]>lines[k+1][i]))up=false;if(!(lines[k][i]<lines[k+1][i]))dn=false}const x=up?1:dn?-1:(mode==="hold"?prev:0);prev=x;return x})}
+function pivots(a,L,R,hi){const o=new Array(a.length).fill(NaN);for(let i=L+R;i<a.length;i++){const p=i-R,v=a[p];let ok=true;for(let j=p-L;j<=p+R&&ok;j++)if(j!==p&&(hi?a[j]>=v:a[j]<=v))ok=false;if(ok)o[i]=v}return o}
+const typ=d=>d.c.map((c,i)=>(d.h[i]+d.l[i]+c)/3);
+const haC=d=>d.c.map((c,i)=>(d.o[i]+d.h[i]+d.l[i]+c)/4);
+/* hold(n,f): f(i,pos) returns the new position, or undefined to keep the current one */
+function hold(n,f){const o=new Array(n);let pos=0;for(let i=0;i<n;i++){const x=f(i,pos);if(x!==undefined)pos=x;o[i]=pos}return o}
+const slopeDir=(a,k=1)=>hold(a.length,i=>i<k?undefined:a[i]>a[i-k]?1:a[i]<a[i-k]?-1:undefined);
+function revCross(x,lo,hi){return hold(x.length,i=>{if(!i)return;const q=x[i-1],v=x[i];if(q<lo&&v>=lo)return 1;if(q>hi&&v<=hi)return -1})}
 
-/* ---------- 50 extra strategies ---------- */
+/* ---------- strategy building blocks ---------- */
+function stKivanc(d,n,m,useRma){const T=trArr(d),A=useRma?rma(T,n):sma(T,n),L=d.c.length,o=new Array(L);let up=0,dn=0,tr=1;
+  for(let i=0;i<L;i++){const s=(d.h[i]+d.l[i])/2;let u=s-m*A[i],w=s+m*A[i];
+    if(i>0){if(d.c[i-1]>up)u=Math.max(u,up);if(d.c[i-1]<dn)w=Math.min(w,dn);
+      if(tr===-1&&d.c[i]>dn)tr=1;else if(tr===1&&d.c[i]<up)tr=-1}
+    up=u;dn=w;o[i]=tr}
+  return o}
+function chandelier(d,period,mult,useClose){const n=d.c.length,A=atr(d,period),out=new Array(n).fill(0);let lsP=0,ssP=0,dir=1;
+  for(let i=0;i<n;i++){
+    let hh=-Infinity,ll=Infinity;const from=Math.max(0,i-period+1);
+    for(let j=from;j<=i;j++){const hv=useClose?d.c[j]:d.h[j],lv=useClose?d.c[j]:d.l[j];if(hv>hh)hh=hv;if(lv<ll)ll=lv}
+    let ls=hh-mult*A[i],ss=ll+mult*A[i];
+    if(i>0){if(d.c[i-1]>lsP)ls=Math.max(ls,lsP);if(d.c[i-1]<ssP)ss=Math.min(ss,ssP);
+      if(d.c[i]>ssP)dir=1;else if(d.c[i]<lsP)dir=-1}
+    out[i]=dir;lsP=ls;ssP=ss}
+  return out}
+const zlsma=(s,n)=>{const a=linreg(s,n).val,b=linreg(a,n).val;return a.map((v,i)=>2*v-b[i])};
+function halfTrend(d,amp){const L=d.c.length,o=new Array(L),hp=hhv(d.h,amp),lp=llv(d.l,amp),hm=sma(d.h,amp),lm=sma(d.l,amp);
+  let trend=0,next=0,maxLow=d.l[0],minHigh=d.h[0];
+  for(let i=0;i<L;i++){const pl=i?d.l[i-1]:d.l[i],ph=i?d.h[i-1]:d.h[i];
+    if(next===1){maxLow=Math.max(lp[i],maxLow);if(hm[i]<maxLow&&d.c[i]<pl){trend=1;next=0;minHigh=hp[i]}}
+    else{minHigh=Math.min(hp[i],minHigh);if(lm[i]>minHigh&&d.c[i]>ph){trend=0;next=1;maxLow=lp[i]}}
+    o[i]=trend===0?1:-1}
+  return o}
+function smoothrng(x,t,m){const a=x.map((v,i)=>i?Math.abs(v-x[i-1]):0);return ema(ema(a,t),t*2-1).map(v=>v*m)}
+function rangeFilter(x,r){let f=x[0],up=0,dn=0;
+  return hold(x.length,i=>{if(!i)return;const pf=f;
+    f=x[i]>pf?(x[i]-r[i]<pf?pf:x[i]-r[i]):(x[i]+r[i]>pf?pf:x[i]+r[i]);
+    up=f>pf?up+1:f<pf?0:up;dn=f<pf?dn+1:f>pf?0:dn;
+    if(x[i]===x[i-1])return;
+    if(x[i]>f&&up>0)return 1;if(x[i]<f&&dn>0)return -1})}
+function hullSuite(s,n,mode){const fl=x=>Math.max(1,Math.floor(x)),sq=Math.max(1,Math.round(Math.sqrt(n)));
+  if(mode==="ehma"){const a=ema(s,fl(n/2)),b=ema(s,n);return ema(a.map((v,i)=>2*v-b[i]),sq)}
+  if(mode==="thma"){const m=fl(n/2),a=wma(s,fl(m/3)),b=wma(s,fl(m/2)),c=wma(s,m);return wma(a.map((v,i)=>3*v-b[i]-c[i]),m)}
+  const a=wma(s,fl(n/2)),b=wma(s,n);return wma(a.map((v,i)=>2*v-b[i]),sq)}
+function varMA(s,len){const a=2/(len+1),ud=s.map((x,i)=>i&&x>s[i-1]?x-s[i-1]:0),dd=s.map((x,i)=>i&&x<s[i-1]?s[i-1]-x:0),U=rsum(ud,9),D=rsum(dd,9);let v=s[0];
+  return s.map((x,i)=>{const cmo=U[i]+D[i]?(U[i]-D[i])/(U[i]+D[i]):0,k=a*Math.abs(cmo);v=k*x+(1-k)*v;return v})}
+function ottLine(m,pct){const L=m.length,mt=new Array(L),ott=new Array(L);let ls=0,ss=0,dir=1;
+  for(let i=0;i<L;i++){const f=m[i]*pct/100;let l=m[i]-f,s=m[i]+f;const lp=i?ls:l,sp=i?ss:s;
+    if(m[i]>lp)l=Math.max(l,lp);if(m[i]<sp)s=Math.min(s,sp);
+    dir=dir===-1&&m[i]>sp?1:dir===1&&m[i]<lp?-1:dir;ls=l;ss=s;
+    const t=dir===1?l:s;mt[i]=t;ott[i]=m[i]>t?t*(200+pct)/200:t*(200-pct)/200}
+  return{mt,ott}}
+function atrLine(d,A,coeff,isUp){let prev=0;return d.c.map((_,i)=>{const up=d.l[i]-A[i]*coeff,dn=d.h[i]+A[i]*coeff;prev=isUp[i]?(up<prev?prev:up):(dn>prev?prev:dn);return prev})}
+function coral(s,sm,cd){const di=(sm-1)/2+1,c1=2/(di+1),c2=1-c1,c3=3*(cd*cd+cd**3),c4=-3*(2*cd*cd+cd+cd**3),c5=3*cd+1+cd**3+3*cd*cd;
+  let i1=s[0],i2=i1,i3=i1,i4=i1,i5=i1,i6=i1;
+  return s.map(x=>{i1=c1*x+c2*i1;i2=c1*i1+c2*i2;i3=c1*i2+c2*i3;i4=c1*i3+c2*i4;i5=c1*i4+c2*i5;i6=c1*i5+c2*i6;return -(cd**3)*i6+c3*i5+c4*i4+c5*i3})}
+function t3(s,n,a){const e1=ema(s,n),e2=ema(e1,n),e3=ema(e2,n),e4=ema(e3,n),e5=ema(e4,n),e6=ema(e5,n),c1=-(a**3),c2=3*a*a+3*a**3,c3=-6*a*a-3*a-3*a**3,c4=1+3*a+a**3+3*a*a;
+  return e6.map((v,i)=>c1*v+c2*e5[i]+c3*e4[i]+c4*e3[i])}
+function gaussChan(d,per,N,mult){const beta=(1-Math.cos(2*Math.PI/per))/(Math.pow(1.414,2/N)-1),al=-beta+Math.sqrt(beta*beta+2*beta);let f=typ(d),r=trArr(d);
+  for(let k=0;k<N;k++){f=emaA(f,al);r=emaA(r,al)}
+  return{f,u:f.map((v,i)=>v+r[i]*mult),l:f.map((v,i)=>v-r[i]*mult)}}
+function qqe(c,rp,sf,qf){const W=rp*2-1,rm=ema(rsi(c,rp),sf),ar=rm.map((v,i)=>i?Math.abs(rm[i-1]-v):0),dar=ema(ema(ar,W),W).map(v=>v*qf),L=c.length,tl=new Array(L);
+  let lb=0,sb=0,plb=0,psb=0,tr=1;
+  for(let i=0;i<L;i++){const R=rm[i],pR=i?rm[i-1]:R,nl=R-dar[i],ns=R+dar[i],lb1=lb,sb1=sb;
+    lb=i&&pR>lb1&&R>lb1?Math.max(lb1,nl):nl;
+    sb=i&&pR<sb1&&R<sb1?Math.min(sb1,ns):ns;
+    if(i>1){const xs=(R>sb1&&pR<=psb)||(R<sb1&&pR>=psb),xl=(lb1>R&&plb<=pR)||(lb1<R&&plb>=pR);tr=xs?1:xl?-1:tr}
+    plb=lb1;psb=sb1;tl[i]=tr===1?lb:sb}
+  return{rm,tl}}
+function stc(c,len,fast,slow,fac){const m=sub(ema(c,fast),ema(c,slow)),lo1=llv(m,len),hi1=hhv(m,len),L=c.length,pfA=new Array(L),o=new Array(L);let f1=0,pf=NaN,f2=0,pff=NaN;
+  for(let i=0;i<L;i++){const v2=hi1[i]-lo1[i];f1=v2>0?(m[i]-lo1[i])/v2*100:f1;pf=isNaN(pf)?f1:pf+fac*(f1-pf);pfA[i]=pf;
+    let lo=Infinity,hi=-Infinity;for(let j=Math.max(0,i-len+1);j<=i;j++){if(pfA[j]<lo)lo=pfA[j];if(pfA[j]>hi)hi=pfA[j]}
+    const v4=hi-lo;f2=v4>0?(pf-lo)/v4*100:f2;pff=isNaN(pff)?f2:pff+fac*(f2-pff);o[i]=pff}
+  return o}
+function lorentzian(d,p){
+  const c=d.c,L=c.length,nf=Math.max(2,Math.min(5,Math.round(p.feats))),W=Math.max(50,Math.round(p.win)),K=Math.max(1,Math.round(p.k));
+  const norm=a=>{let mn=Infinity,mx=-Infinity;return a.map(v=>{if(v<mn)mn=v;if(v>mx)mx=v;return(v-mn)/Math.max(mx-mn,1e-9)})};
+  const ap=typ(d),e1=ema(ap,10),e2=ema(ap.map((v,i)=>Math.abs(v-e1[i])),10),ci=ap.map((v,i)=>e2[i]?(v-e1[i])/(0.015*e2[i]):0),w1=ema(ci,11),w2=sma(w1,4);
+  const F=[rsi(c,14).map(v=>v/100),norm(sub(w1,w2)),norm(cci(c,20)),dmi(d,20).adx.map(v=>v/100),rsi(c,9).map(v=>v/100)].slice(0,nf);
+  const y=c.map((v,i)=>i<4?0:c[i-4]<v?-1:c[i-4]>v?1:0);
+  const T=trArr(d),hatr=rma(T,10),o4=c.map((v,i)=>(d.o[i]+d.h[i]+d.l[i]+v)/4),slope=new Array(L);
+  let v1=0,v2=0,k=o4[0];
+  for(let i=0;i<L;i++){if(i)v1=0.2*(o4[i]-o4[i-1])+0.8*v1;v2=0.1*(d.h[i]-d.l[i])+0.8*v2;
+    const om=v2?Math.abs(v1/v2):0,al=(-om*om+Math.sqrt(om**4+16*om*om))/8,pk=k;k=al*o4[i]+(1-al)*k;slope[i]=Math.abs(k-pk)}
+  const es=ema(slope,200),kw=[];for(let i=0;i<=26;i++)kw.push(Math.pow(1+i*i/(64*2*8),-8));
+  const yh=c.map((_,i)=>{let s=0,ws=0;for(let j=0;j<kw.length&&j<=i;j++){s+=c[i-j]*kw[j];ws+=kw[j]}return s/ws});
+  const sig=new Array(L).fill(0),sl=new Array(L).fill(false),ss=new Array(L).fill(false),out=new Array(L).fill(0),dist=[],pred=[];
+  let signal=0,held=0,pos=0;
+  for(let i=0;i<L;i++){
+    dist.length=0;pred.length=0;let last=-1;
+    for(let j=Math.max(0,i-W+1);j<=i;j++){if(j%4===0)continue;let dd=0;for(let f=0;f<nf;f++)dd+=Math.log(1+Math.abs(F[f][i]-F[f][j]));
+      if(dd>=last){last=dd;dist.push(dd);pred.push(y[j]);if(pred.length>K){last=dist[Math.round(K*3/4)];dist.shift();pred.shift()}}}
+    let pr=0;for(const x of pred)pr+=x;
+    const fv=p.vf==="0"||T[i]>hatr[i],fr=p.rf==="0"||(es[i]>0&&(slope[i]-es[i])/es[i]>=-0.1),fa=fv&&fr;
+    const prev=signal;signal=pr>0&&fa?1:pr<0&&fa?-1:signal;sig[i]=signal;
+    held=signal!==prev?0:held+1;
+    const bull=p.kf==="0"||(i>0&&yh[i-1]<yh[i]),bear=p.kf==="0"||(i>0&&yh[i-1]>yh[i]);
+    const newBuy=signal===1&&prev!==1,newSell=signal===-1&&prev!==-1;
+    sl[i]=newBuy&&bull;ss[i]=newSell&&bear;
+    const lastBuy=i>=4&&sig[i-4]===1,lastSell=i>=4&&sig[i-4]===-1,less=held>0&&held<4;
+    const endL=((held===4&&lastBuy)||(less&&newSell&&lastBuy))&&i>=4&&sl[i-4];
+    const endS=((held===4&&lastSell)||(less&&newBuy&&lastSell))&&i>=4&&ss[i-4];
+    if(sl[i])pos=1;else if(ss[i])pos=-1;else if(p.exit==="4"&&((pos===1&&endL)||(pos===-1&&endS)))pos=0;
+    out[i]=pos}
+  return out}
+
+/* ---------- strategies: return desired position per bar close (1, -1, 0) ---------- */
+const STRATS={};
 const N=(k,l,v,step)=>({k,l,v,step});
 const SEL=(k,l,v,o)=>({k,l,t:"sel",v,o});
-const MODE=l=>SEL("mode",l||"When not aligned","flat",[["flat","Go flat"],["hold","Hold last signal"]]);
+const YN=(k,l,v)=>SEL(k,l,v,[["1","Yes"],["0","No"]]);
 function add(id,cat,name,hint,params,warm,run){STRATS[id]={cat,name,hint,params,warm,run}}
-const CATS={ema2:"Moving averages",ema3:"Moving averages",ce:"Trend and breakout",macd:"Momentum and volume",rsi:"Reversal"};
-Object.keys(CATS).forEach(k=>STRATS[k].cat=CATS[k]);
-const MA="Moving averages",TR="Trend and breakout",MO="Momentum and volume",RV="Reversal",CB="Filtered combos";
+const TF="Trend following",MO="Momentum",BB="Bands and breakouts",ML="Machine learning";
+const CATS=[TF,MO,BB,ML];
 
-/* Moving averages */
-add("sma2",MA,"SMA cross (2 lines)","Long while the fast SMA is above the slow SMA, short while below.",[N("fast","Fast SMA",50),N("slow","Slow SMA",200)],p=>Math.max(p.fast,p.slow)+5,(d,p)=>{const f=sma(d.c,p.fast),s=sma(d.c,p.slow);return d.c.map((_,i)=>sgn(f[i]-s[i]))});
-add("sma3",MA,"Triple SMA alignment","Long when fast > mid > slow SMA, short when fast < mid < slow.",[N("fast","Fast SMA",10),N("mid","Mid SMA",30),N("slow","Slow SMA",90),MODE()],p=>p.slow+5,(d,p)=>alignDir([sma(d.c,p.fast),sma(d.c,p.mid),sma(d.c,p.slow)],p.mode));
-add("dema2",MA,"DEMA cross","Double EMA cuts lag. Long while the fast DEMA is above the slow DEMA.",[N("fast","Fast DEMA",21),N("slow","Slow DEMA",55)],p=>Math.max(p.fast,p.slow)*2,(d,p)=>{const f=dema(d.c,p.fast),s=dema(d.c,p.slow);return d.c.map((_,i)=>sgn(f[i]-s[i]))});
-add("tema2",MA,"TEMA cross","Triple EMA cuts lag even more. Long while the fast TEMA is above the slow TEMA.",[N("fast","Fast TEMA",21),N("slow","Slow TEMA",55)],p=>Math.max(p.fast,p.slow)*2,(d,p)=>{const f=tema(d.c,p.fast),s=tema(d.c,p.slow);return d.c.map((_,i)=>sgn(f[i]-s[i]))});
-add("hma",MA,"Hull MA slope","Long while the Hull moving average is rising, short while falling.",[N("len","Hull length",55)],p=>p.len*2,(d,p)=>{const h=hma(d.c,p.len);return h.map((v,i)=>i?sgn(v-h[i-1]):0)});
-add("kama",MA,"KAMA trend","Adaptive moving average that slows down in chop. Long while price is above it.",[N("len","Efficiency length",10),N("fast","Fast period",2),N("slow","Slow period",30)],p=>p.len*4+p.slow,(d,p)=>{const k=kama(d.c,p.len,p.fast,p.slow);return d.c.map((c,i)=>sgn(c-k[i]))});
-add("zlsma",MA,"ZLSMA trend","Zero-lag least squares MA. Long while price is above it.",[N("len","Length",32)],p=>p.len*3,(d,p)=>{const a=linreg(d.c,p.len).val,b=linreg(a,p.len).val;return d.c.map((c,i)=>sgn(c-(2*a[i]-b[i])))});
-add("pema",MA,"Price vs EMA","Long while the close is above one EMA, short while below. The simplest trend filter.",[N("len","EMA length",200)],p=>p.len*2,(d,p)=>{const e=ema(d.c,p.len);return d.c.map((c,i)=>sgn(c-e[i]))});
-add("linreg",MA,"Linear regression slope","Long while the regression line over the last N candles slopes up.",[N("len","Length",50)],p=>p.len*2,(d,p)=>linreg(d.c,p.len).slope.map(sgn));
-add("alligator",MA,"Williams Alligator","Long when lips > teeth > jaw (mouth open up), short when reversed, flat when tangled.",[N("jaw","Jaw length",13),N("teeth","Teeth length",8),N("lips","Lips length",5)],p=>p.jaw*4,(d,p)=>{const m=d.c.map((_,i)=>(d.h[i]+d.l[i])/2),J=rma(m,p.jaw),T=rma(m,p.teeth),L=rma(m,p.lips);const sh=(a,k)=>a.map((_,i)=>a[Math.max(0,i-k)]);return alignDir([sh(L,3),sh(T,5),sh(J,8)],"flat")});
-add("ichimoku",MA,"Ichimoku cloud","Long when price closes above the cloud, short below. Inside the cloud follows your choice.",[N("tenkan","Tenkan",9),N("kijun","Kijun",26),N("senkou","Senkou B",52),MODE("Inside the cloud")],p=>(p.senkou+p.kijun)*2,(d,p)=>{const mid=n=>{const h=hhv(d.h,n),l=llv(d.l,n);return h.map((v,i)=>(v+l[i])/2)};const t=mid(p.tenkan),k=mid(p.kijun),sb=mid(p.senkou);let prev=0;return d.c.map((c,i)=>{const j=i-p.kijun;if(j<0)return 0;const a=(t[j]+k[j])/2,b=sb[j],top=Math.max(a,b),bot=Math.min(a,b);if(c>top)prev=1;else if(c<bot)prev=-1;else if(p.mode==="flat")prev=0;return prev})});
-add("ha",MA,"Heikin-Ashi trend","Smoothed candles. Long after N green Heikin-Ashi candles in a row, short after N red.",[N("n","Candles to confirm",2)],p=>20,(d,p)=>{let ho=(d.o[0]+d.c[0])/2,hc=(d.o[0]+d.h[0]+d.l[0]+d.c[0])/4,pos=0,run=0,last=0;return d.c.map((_,i)=>{if(i>0){const nho=(ho+hc)/2;hc=(d.o[i]+d.h[i]+d.l[i]+d.c[i])/4;ho=nho}const cl=hc>ho?1:-1;if(cl===last)run++;else{run=1;last=cl}if(run>=p.n)pos=cl;return pos})});
-add("ribbon",MA,"EMA ribbon (8-89)","Long when the 8/13/21/34/55/89 EMAs are fully stacked upward, short when stacked downward.",[MODE()],p=>180,(d,p)=>alignDir([8,13,21,34,55,89].map(n=>ema(d.c,n)),p.mode));
+/* Trend following */
+add("supertrend",TF,"Supertrend [KivancOzbilgic]","ATR trailing line around the median price. Long while the trend is up, short while it is down.",
+  [N("len","ATR period",10),N("mult","ATR multiplier",3,.1),SEL("atrm","ATR method","rma",[["rma","Wilder (script default)"],["sma","Simple average"]])],
+  p=>p.len*4,(d,p)=>stKivanc(d,p.len,p.mult,p.atrm==="rma"));
+add("utbot",TF,"UT Bot Alerts [QuantNomad]","ATR trailing stop. Buy when price crosses above it, sell when price crosses below. The key value sets the stop distance.",
+  [N("a","Key value",1,.1),N("c","ATR period",10),YN("ha","Heikin-Ashi source","0")],
+  p=>p.c*4,(d,p)=>{const s=p.ha==="1"?haC(d):d.c,A=atr(d,p.c);let st=0;
+    return hold(s.length,i=>{const x=s[i],x1=i?s[i-1]:x,prev=st,nl=p.a*A[i];
+      st=x>prev&&x1>prev?Math.max(prev,x-nl):x<prev&&x1<prev?Math.min(prev,x+nl):x>prev?x-nl:x+nl;
+      if(!i)return;if(x>st&&x1<=prev)return 1;if(x<st&&x1>=prev)return -1})});
+add("ce",TF,"Chandelier Exit [everget]","ATR trailing stop that flips long or short when price closes through it. The script default is 22 / 3; this starts at your usual 4 / 2.",
+  [N("period","ATR period",4),N("mult","ATR multiplier",2,.1),SEL("useClose","Highest/lowest of","1",[["1","Closes"],["0","Highs and lows"]])],
+  p=>Math.max(p.period,2)*4,(d,p)=>chandelier(d,p.period,p.mult,p.useClose==="1"));
+add("cezl",TF,"Chandelier Exit + ZLSMA","The popular combo: Chandelier Exit longs only above the zero-lag LSMA, shorts only below it, flat otherwise.",
+  [N("period","ATR period",1),N("mult","ATR multiplier",2,.1),N("len","ZLSMA length",50)],
+  p=>p.len*3,(d,p)=>{const ce=chandelier(d,p.period,p.mult,true),z=zlsma(d.c,p.len);return d.c.map((c,i)=>ce[i]===1&&c>z[i]?1:ce[i]===-1&&c<z[i]?-1:0)});
+add("halftrend",TF,"HalfTrend [everget]","Flips when price breaks the recent swing range by a set amplitude. Long while the line is blue, short while red.",
+  [N("amp","Amplitude",2)],
+  p=>Math.max(p.amp*4,50),(d,p)=>halfTrend(d,Math.max(1,Math.round(p.amp))));
+add("ppst",TF,"Pivot Point SuperTrend [LonesomeTheBlue]","Supertrend built around a running average of pivot highs and lows instead of the median price.",
+  [N("prd","Pivot period",2),N("f","ATR factor",3,.1),N("pd","ATR period",10)],
+  p=>Math.max(p.pd,p.prd)*6,(d,p)=>{const n=Math.max(1,Math.round(p.prd)),ph=pivots(d.h,n,n,true),pl=pivots(d.l,n,n,false),A=atr(d,p.pd);let center=NaN,tup=NaN,tdn=NaN;
+    return hold(d.c.length,i=>{const lp=!isNaN(ph[i])?ph[i]:pl[i];if(!isNaN(lp))center=isNaN(center)?lp:(center*2+lp)/3;
+      if(isNaN(center))return;const up=center-p.f*A[i],dn=center+p.f*A[i],pu=tup,pd=tdn;
+      tup=d.c[i-1]>pu?Math.max(up,pu):up;tdn=d.c[i-1]<pd?Math.min(dn,pd):dn;
+      if(d.c[i]>pd)return 1;if(d.c[i]<pu)return -1})});
+add("rangefilter",TF,"Range Filter Buy and Sell [guikroth]","A price filter that only moves when price travels further than its smoothed average range. Buy when price turns up through it, sell when it turns down.",
+  [N("per","Sampling period",100),N("mult","Range multiplier",3,.1)],
+  p=>p.per*3,(d,p)=>rangeFilter(d.c,smoothrng(d.c,p.per,p.mult)));
+add("twinrange",TF,"Twin Range Filter [colinmck]","Range filter using the average of a fast and a slow smoothed range.",
+  [N("p1","Fast period",27),N("m1","Fast multiplier",1.6,.1),N("p2","Slow period",55),N("m2","Slow multiplier",2,.1)],
+  p=>Math.max(p.p1,p.p2)*3,(d,p)=>{const a=smoothrng(d.c,p.p1,p.m1),b=smoothrng(d.c,p.p2,p.m2);return rangeFilter(d.c,a.map((v,i)=>(v+b[i])/2))});
+add("ssl",TF,"SSL Channel [ErwinBeckers]","Moving averages of highs and lows. Long after a close above the high line, short after a close below the low line.",
+  [N("len","Period",10)],
+  p=>p.len*2,(d,p)=>{const sh=sma(d.h,p.len),sl=sma(d.l,p.len);return hold(d.c.length,i=>d.c[i]>sh[i]?1:d.c[i]<sl[i]?-1:undefined)});
+add("hull",TF,"Hull Suite [InSilico]","Hull moving average. Long while it is above its value two candles ago (green), short while below (red).",
+  [SEL("mode","Variation","hma",[["hma","HMA"],["ehma","EHMA"],["thma","THMA"]]),N("len","Length",55),N("mult","Length multiplier",1,.1)],
+  p=>p.len*p.mult*2,(d,p)=>{const H=hullSuite(d.c,Math.max(2,Math.round(p.len*p.mult)),p.mode);return H.map((v,i)=>i<2?0:v>H[i-2]?1:-1)});
+add("ott",TF,"Optimized Trend Tracker [KivancOzbilgic]","OTT on a variable moving average (VAR). Long while the average is above the OTT line from two candles ago.",
+  [N("len","MA length",2),N("pct","Percent",1.4,.1)],
+  p=>60,(d,p)=>{const m=varMA(d.c,p.len),o=ottLine(m,p.pct).ott;return hold(m.length,i=>i<2?undefined:m[i]>o[i-2]?1:m[i]<o[i-2]?-1:undefined)});
+add("most",TF,"MOST Moving Stop Loss [KivancOzbilgic]","Percentage trailing stop around an EMA. Long while the EMA is above the stop line, short while below.",
+  [N("len","EMA length",3),N("pct","Percent",2,.1)],
+  p=>p.len*4+30,(d,p)=>{const m=ema(d.c,p.len),t=ottLine(m,p.pct).mt;return hold(m.length,i=>m[i]>t[i]?1:m[i]<t[i]?-1:undefined)});
+add("alphatrend",TF,"AlphaTrend [KivancOzbilgic]","ATR line that only rises while money flow is above 50 and only falls while below. Long when it crosses above its value two candles ago.",
+  [N("coeff","Multiplier",1,.1),N("ap","Common period",14),SEL("src","Momentum source","mfi",[["mfi","Money Flow Index"],["rsi","RSI (no volume)"]])],
+  p=>p.ap*4,(d,p)=>{const A=sma(trArr(d),p.ap),m=p.src==="rsi"?rsi(d.c,p.ap):mfi(typ(d),d.v,p.ap),at=atrLine(d,A,p.coeff,m.map(v=>v>=50));
+    return hold(at.length,i=>i<2?undefined:at[i]>at[i-2]?1:at[i]<at[i-2]?-1:undefined)});
+add("trendmagic",TF,"Trend Magic [KivancOzbilgic]","CCI decides whether the ATR line trails below price (blue) or above it (red).",
+  [N("cci","CCI period",20),N("coeff","ATR multiplier",1,.1),N("ap","ATR period",5),SEL("rule","Signal","cross",[["cross","Price crosses the line"],["color","Line color (CCI above 0)"]])],
+  p=>Math.max(p.cci,p.ap)*4,(d,p)=>{const A=sma(trArr(d),p.ap),cc=cci(d.c,p.cci);if(p.rule==="color")return cc.map(v=>v>=0?1:-1);
+    const line=atrLine(d,A,p.coeff,cc.map(v=>v>=0));return hold(line.length,i=>d.c[i]>line[i]?1:d.c[i]<line[i]?-1:undefined)});
+add("coral",TF,"Coral Trend [LazyBear]","Six-stage smoothed trend line. Long while it rises, short while it falls.",
+  [N("sm","Smoothing period",21),N("cd","Constant D",0.4,.05)],
+  p=>p.sm*8,(d,p)=>slopeDir(coral(d.c,p.sm,p.cd)));
+add("mavilimw",TF,"MavilimW [KivancOzbilgic]","Six stacked weighted moving averages with Fibonacci-style lengths. Long while the line rises, short while it falls.",
+  [N("f","First length",3),N("s","Second length",5)],
+  p=>(p.f+p.s)*12,(d,p)=>{const f=p.f,s=p.s,t=f+s,F=s+t,Ft=t+F,S=F+Ft;let m=wma(d.c,f);for(const n of [s,t,F,Ft,S])m=wma(m,n);return slopeDir(m)});
+add("t3",TF,"Tillson T3 [KivancOzbilgic]","Smooth, low-lag T3 moving average. Long while it rises, short while it falls.",
+  [N("len","Length",8),N("vf","Volume factor",0.7,.05)],
+  p=>p.len*12,(d,p)=>slopeDir(t3(d.c,p.len,p.vf)));
+add("gauss",TF,"Gaussian Channel [DonovanWall]","Multi-pole Gaussian filter with a true-range channel. Trend mode follows the filter slope; band mode needs a close outside the channel.",
+  [N("per","Sampling period",144),N("poles","Poles",4),N("mult","Range multiplier",1.414,.01),SEL("rule","Rule","slope",[["slope","Filter rising / falling"],["band","Close beyond the band, exit back inside"]])],
+  p=>p.per*2,(d,p)=>{const g=gaussChan(d,p.per,Math.max(1,Math.min(9,Math.round(p.poles))),p.mult);if(p.rule==="slope")return slopeDir(g.f);
+    return hold(d.c.length,(i,pos)=>{if(!i)return;const c=d.c[i],up=g.f[i]>g.f[i-1],dn=g.f[i]<g.f[i-1];
+      if(up&&c>g.u[i])return 1;if(dn&&c<g.l[i])return -1;if((pos===1&&c<g.u[i])||(pos===-1&&c>g.l[i]))return 0})});
+add("sha",TF,"Smoothed Heiken Ashi [jackvmk]","Heikin-Ashi candles built from EMAs, then smoothed again. Long while the smoothed candle is green.",
+  [N("len","First smoothing",10),N("len2","Second smoothing",10)],
+  p=>(p.len+p.len2)*4,(d,p)=>{const o=ema(d.o,p.len),c=ema(d.c,p.len),h=ema(d.h,p.len),l=ema(d.l,p.len),hc=o.map((v,i)=>(v+h[i]+l[i]+c[i])/4),ho=new Array(hc.length);
+    ho[0]=(o[0]+c[0])/2;for(let i=1;i<hc.length;i++)ho[i]=(ho[i-1]+hc[i-1])/2;const o2=ema(ho,p.len2),c2=ema(hc,p.len2);return o2.map((v,i)=>v>c2[i]?-1:1)});
+add("itrend",TF,"Ehlers Instantaneous Trendline [LazyBear]","Long while the trigger line is above the trendline, short while below.",
+  [N("a","Alpha",0.07,.01)],
+  p=>100,(d,p)=>{const s=d.h.map((h,i)=>(h+d.l[i])/2),a=p.a,it=new Array(s.length);
+    for(let i=0;i<s.length;i++)it[i]=i<7?(s[i]+2*s[Math.max(0,i-1)]+s[Math.max(0,i-2)])/4:(a-a*a/4)*s[i]+0.5*a*a*s[i-1]-(a-0.75*a*a)*s[i-2]+2*(1-a)*it[i-1]-(1-a)**2*it[i-2];
+    return hold(s.length,i=>{if(i<2)return;const lag=2*it[i]-it[i-2];return lag>it[i]?1:lag<it[i]?-1:undefined})});
 
-/* Trend and breakout */
-add("supertrend",TR,"Supertrend","ATR-based trailing line. Long while price is above it, short while below.",[N("len","ATR length",10),N("mult","Multiplier",3,.1)],p=>p.len*4,(d,p)=>supertrend(d,p.len,p.mult));
-add("psar",TR,"Parabolic SAR","Stop-and-reverse dots. Long while the dots are below price.",[N("step","Step",0.02,.005),N("max","Max step",0.2,.01)],p=>30,(d,p)=>psar(d,p.step,p.max));
-add("adxdi",TR,"ADX with DI cross","Trade the +DI/-DI cross only while ADX shows a real trend, flat otherwise.",[N("len","Length",14),N("th","ADX threshold",20)],p=>p.len*4,(d,p)=>{const m=dmi(d,p.len);return d.c.map((_,i)=>m.adx[i]>p.th?sgn(m.pdi[i]-m.ndi[i]):0)});
-add("aroon",TR,"Aroon cross","Long when Aroon-up is above Aroon-down (new highs are more recent than new lows).",[N("len","Length",25)],p=>p.len*3,(d,p)=>{const n=p.len;return d.c.map((_,i)=>{const s=Math.max(0,i-n);let hi=s,lo=s;for(let j=s;j<=i;j++){if(d.h[j]>=d.h[hi])hi=j;if(d.l[j]<=d.l[lo])lo=j}return sgn(lo-hi)})});
-add("vortex",TR,"Vortex cross","Long when +VI is above -VI, short when below.",[N("len","Length",14)],p=>p.len*3,(d,p)=>{const vp=[0],vm=[0],tr=[d.h[0]-d.l[0]];for(let i=1;i<d.c.length;i++){vp.push(Math.abs(d.h[i]-d.l[i-1]));vm.push(Math.abs(d.l[i]-d.h[i-1]));tr.push(Math.max(d.h[i]-d.l[i],Math.abs(d.h[i]-d.c[i-1]),Math.abs(d.l[i]-d.c[i-1])))}const a=sma(vp,p.len),b=sma(vm,p.len);return a.map((v,i)=>sgn(v-b[i]))});
-add("donch",TR,"Donchian breakout","Long on a close above the prior N-candle high, short on a close below the prior N-candle low.",[N("len","Channel length",20)],p=>p.len*2,(d,p)=>{const h=hhv(d.h,p.len,1),l=llv(d.l,p.len,1);let pos=0;return d.c.map((c,i)=>{if(i>p.len){if(c>h[i])pos=1;else if(c<l[i])pos=-1}return pos})});
-add("turtle",TR,"Turtle system","Enter on a long channel breakout, exit to flat on a shorter opposite channel (55/20 is System 2).",[N("entry","Entry channel",55),N("exit","Exit channel",20)],p=>p.entry*2,(d,p)=>{const eh=hhv(d.h,p.entry,1),el=llv(d.l,p.entry,1),xh=hhv(d.h,p.exit,1),xl=llv(d.l,p.exit,1);let pos=0;return d.c.map((c,i)=>{if(i<=p.entry)return 0;if(c>eh[i])pos=1;else if(c<el[i])pos=-1;else if(pos===1&&c<xl[i])pos=0;else if(pos===-1&&c>xh[i])pos=0;return pos})});
-add("keltner",TR,"Keltner breakout","Long on a close above the upper Keltner band, short below the lower, exit at the middle EMA.",[N("len","Length",20),N("mult","ATR multiplier",2,.1)],p=>p.len*3,(d,p)=>{const m=ema(d.c,p.len),A=atr(d,p.len);return chanBreak(d.c,m.map((v,i)=>v+p.mult*A[i]),m.map((v,i)=>v-p.mult*A[i]),m)});
-add("bbbreak",TR,"Bollinger breakout","Long on a close above the upper band, short below the lower, exit at the middle band.",[N("len","Length",20),N("k","Std deviations",2,.1)],p=>p.len*2,(d,p)=>{const b=bands(d.c,p.len,p.k);return chanBreak(d.c,b.u,b.l,b.m)});
-add("squeeze",TR,"TTM Squeeze","When Bollinger bands exit the Keltner channel (squeeze release), trade the momentum direction until momentum crosses zero.",[N("len","Length",20),N("bbk","Bollinger std dev",2,.1),N("kck","Keltner multiplier",1.5,.1)],p=>p.len*4,(d,p)=>{const b=bands(d.c,p.len,p.bbk),km=ema(d.c,p.len),A=atr(d,p.len);const on=d.c.map((_,i)=>b.u[i]<km[i]+p.kck*A[i]&&b.l[i]>km[i]-p.kck*A[i]);const hh=hhv(d.h,p.len),ll=llv(d.l,p.len),sm=sma(d.c,p.len);const mom=linreg(d.c.map((c,i)=>c-((hh[i]+ll[i])/2+sm[i])/2),p.len).val;let pos=0;return d.c.map((_,i)=>{if(i===0)return 0;if(on[i-1]&&!on[i])pos=sgn(mom[i]);else if(pos===1&&mom[i]<0)pos=0;else if(pos===-1&&mom[i]>0)pos=0;return pos})});
-add("engulf",TR,"Engulfing candles","Long after a bullish engulfing candle, short after a bearish one, holds until the opposite pattern.",[],p=>10,(d,p)=>{let pos=0;return d.c.map((c,i)=>{if(i>0){const po=d.o[i-1],pc=d.c[i-1];if(pc<po&&c>d.o[i]&&c>=po&&d.o[i]<=pc)pos=1;else if(pc>po&&c<d.o[i]&&c<=po&&d.o[i]>=pc)pos=-1}return pos})});
+/* Momentum */
+add("squeeze",MO,"Squeeze Momentum [LazyBear]","Bollinger Bands inside the Keltner Channel mark a squeeze. Pick how the momentum histogram is traded.",
+  [N("len","BB length",20),N("lenKC","KC length",20),N("multKC","KC multiplier",1.5,.1),YN("useTR","Use true range","1"),
+    SEL("rule","Rule","zero",[["zero","Momentum above / below zero"],["slope","Momentum rising / falling"],["release","Squeeze release, exit at zero"]])],
+  p=>Math.max(p.len,p.lenKC)*4,(d,p)=>{const c=d.c,basis=sma(c,p.len),sd=stdev(c,p.len),ma=sma(c,p.lenKC),rg=p.useTR==="1"?trArr(d):d.h.map((h,i)=>h-d.l[i]),rgm=sma(rg,p.lenKC);
+    const hh=hhv(d.h,p.lenKC),ll=llv(d.l,p.lenKC),sc=sma(c,p.lenKC),val=linreg(c.map((x,i)=>x-((hh[i]+ll[i])/2+sc[i])/2),p.lenKC).val;
+    if(p.rule==="zero")return val.map(sgn);
+    if(p.rule==="slope")return slopeDir(val);
+    const on=c.map((_,i)=>{const dv=p.multKC*sd[i];return basis[i]-dv>ma[i]-rgm[i]*p.multKC&&basis[i]+dv<ma[i]+rgm[i]*p.multKC});
+    return hold(c.length,(i,pos)=>{if(!i)return;if(on[i-1]&&!on[i])return sgn(val[i]);if((pos===1&&val[i]<0)||(pos===-1&&val[i]>0))return 0})});
+add("wavetrend",MO,"WaveTrend Oscillator [LazyBear]","Long when WT1 crosses above WT2, short when it crosses below. With a level set, only crosses beyond that level count.",
+  [N("n1","Channel length",10),N("n2","Average length",21),N("lvl","Cross level (0 = any)",53)],
+  p=>(p.n1+p.n2)*4,(d,p)=>{const ap=typ(d),esa=ema(ap,p.n1),dd=ema(ap.map((v,i)=>Math.abs(v-esa[i])),p.n1),ci=ap.map((v,i)=>dd[i]?(v-esa[i])/(0.015*dd[i]):0),w1=ema(ci,p.n2),w2=sma(w1,4);
+    return hold(w1.length,i=>{if(!i)return;const up=w1[i]>w2[i]&&w1[i-1]<=w2[i-1],dn=w1[i]<w2[i]&&w1[i-1]>=w2[i-1];
+      if(up&&(!p.lvl||w2[i]<=-p.lvl))return 1;if(dn&&(!p.lvl||w2[i]>=p.lvl))return -1})});
+add("qqemod",MO,"QQE MOD [Mihkel00]","Two QQE lines plus a Bollinger filter. Long on a blue bar, short on a red bar.",
+  [N("rp","RSI length",6),N("sf","RSI smoothing",5),N("qf","Fast QQE factor",3,.1),N("qf2","Second QQE factor",1.61,.01),N("th","Threshold",3),N("blen","Bollinger length",50),N("bm","Bollinger multiplier",0.35,.05),
+    SEL("mode","Between signals","hold",[["hold","Hold last signal"],["flat","Go flat"]])],
+  p=>Math.max(p.blen,p.rp*4)*3,(d,p)=>{const q1=qqe(d.c,p.rp,p.sf,p.qf),q2=qqe(d.c,p.rp,p.sf,p.qf2),x=q1.tl.map(v=>v-50),b=bands(x,p.blen,p.bm);
+    return hold(x.length,i=>{const r1=q1.rm[i]-50,r2=q2.rm[i]-50;if(r2>p.th&&r1>b.u[i])return 1;if(r2<-p.th&&r1<b.l[i])return -1;if(p.mode==="flat")return 0})});
+add("cmmacd",MO,"MACD Custom [ChrisMoody]","ChrisMoody's MACD with a simple-average signal line. Trade the signal cross or the histogram color.",
+  [N("fast","Fast length",12),N("slow","Slow length",26),N("sig","Signal length",9),SEL("rule","Rule","cross",[["cross","MACD vs signal line"],["hist","Histogram rising / falling"]])],
+  p=>Math.max(p.fast,p.slow)*3,(d,p)=>{const m=sub(ema(d.c,p.fast),ema(d.c,p.slow)),s=sma(m,p.sig),h=sub(m,s);return p.rule==="hist"?slopeDir(h):h.map(sgn)});
+add("wae",MO,"Waddah Attar Explosion [LazyBear]","Trade when the MACD-change bar beats both the Bollinger explosion line and the dead zone.",
+  [N("sens","Sensitivity",150),N("fast","Fast EMA",20),N("slow","Slow EMA",40),N("ch","BB length",20),N("mult","BB multiplier",2,.1),
+    SEL("mode","Exit","fade",[["fade","When the bar drops below the explosion line"],["hold","Only on the opposite signal"]])],
+  p=>120,(d,p)=>{const m=sub(ema(d.c,p.fast),ema(d.c,p.slow)),b=bands(d.c,p.ch,p.mult),dz=rma(trArr(d),100).map(v=>v*3.7);
+    return hold(d.c.length,(i,pos)=>{if(!i)return;const t1=(m[i]-m[i-1])*p.sens,e1=b.u[i]-b.l[i],up=t1>=0?t1:0,dn=t1<0?-t1:0;
+      if(up>e1&&up>dz[i])return 1;if(dn>e1&&dn>dz[i])return -1;
+      if(p.mode==="fade"&&((pos===1&&up<=e1)||(pos===-1&&dn<=e1)))return 0})});
+add("stc",MO,"Schaff Trend Cycle [LazyBear]","Double-stochastic of MACD. Long when it crosses above the low level, short when it crosses below the high level.",
+  [N("len","Cycle length",10),N("fast","Fast length",23),N("slow","Slow length",50),N("lo","Low level",25),N("hi","High level",75)],
+  p=>(p.slow+p.len)*3,(d,p)=>revCross(stc(d.c,p.len,p.fast,p.slow,0.5),p.lo,p.hi));
+add("vfi",MO,"Volume Flow Indicator [LazyBear]","Volume-weighted money flow with outlier volume capped. Long while VFI is above zero, or above its signal line.",
+  [N("len","VFI length",130),N("coef","Coefficient",0.2,.05),N("vcoef","Max volume cutoff",2.5,.1),N("sig","Signal length",5),SEL("rule","Rule","zero",[["zero","VFI above / below zero"],["signal","VFI vs signal line"]])],
+  p=>p.len*2,(d,p)=>{const c=d.c,v=d.v,tp=typ(d),inter=tp.map((x,i)=>i?Math.log(x)-Math.log(tp[i-1]):0),vin=stdev(inter,30),sv=sma(v,p.len);
+    const vcp=c.map((x,i)=>{if(!i)return 0;const vc=Math.min(v[i],sv[i-1]*p.vcoef),mf=tp[i]-tp[i-1],cut=p.coef*vin[i]*x;return mf>cut?vc:mf<-cut?-vc:0});
+    const s=rsum(vcp,p.len),vfi=sma(s.map((x,i)=>i&&sv[i-1]?x/sv[i-1]:0),3),sg=ema(vfi,p.sig);return p.rule==="zero"?vfi.map(sgn):vfi.map((x,i)=>sgn(x-sg[i]))});
+add("vixfix",MO,"Williams Vix Fix [ChrisMoody]","Synthetic VIX that spikes at capitulation lows. Long-only: buy on a spike, sell after a set number of candles.",
+  [N("pd","Look-back",22),N("bbl","BB length",20),N("mult","BB multiplier",2,.1),N("lb","Percentile look-back",50),N("ph","Highest percentile",0.85,.01),N("hold","Candles to hold",10)],
+  p=>Math.max(p.pd,p.bbl,p.lb)*2,(d,p)=>{const hc=hhv(d.c,p.pd),w=d.c.map((_,i)=>(hc[i]-d.l[i])/hc[i]*100),sd=stdev(w,p.bbl),mid=sma(w,p.bbl),rh=hhv(w,p.lb);let held=0;
+    return hold(w.length,(i,pos)=>{if(w[i]>=mid[i]+p.mult*sd[i]||w[i]>=rh[i]*p.ph){held=0;return 1}if(pos===1&&++held>=p.hold)return 0})});
 
-/* Momentum and volume */
-add("macd0",MO,"MACD zero line","Long while the MACD line is above zero, short while below.",[N("fast","Fast EMA",12),N("slow","Slow EMA",26)],p=>Math.max(p.fast,p.slow)*3,(d,p)=>{const a=ema(d.c,p.fast),b=ema(d.c,p.slow);return a.map((v,i)=>sgn(v-b[i]))});
-add("trix",MO,"TRIX signal cross","Triple-smoothed rate of change. Long when TRIX is above its signal line.",[N("len","TRIX length",15),N("sig","Signal",9)],p=>p.len*6,(d,p)=>{const e=ema(ema(ema(d.c.map(Math.log),p.len),p.len),p.len),t=e.map((v,i)=>i?(v-e[i-1])*10000:0),s=ema(t,p.sig);return t.map((v,i)=>sgn(v-s[i]))});
-add("roc",MO,"Momentum (ROC)","Long when price is higher than N candles ago, short when lower.",[N("len","Look-back candles",60)],p=>p.len+5,(d,p)=>d.c.map((c,i)=>i>=p.len?sgn(c-d.c[i-p.len]):0));
-add("ao",MO,"Awesome Oscillator","Long while the 5/34 SMA of median price is above zero, short while below.",[N("fast","Fast",5),N("slow","Slow",34)],p=>p.slow*2,(d,p)=>{const m=d.c.map((_,i)=>(d.h[i]+d.l[i])/2),a=sma(m,p.fast),b=sma(m,p.slow);return a.map((v,i)=>sgn(v-b[i]))});
-add("cci",MO,"CCI trend","Long when CCI rises above +level, short when it falls below -level, holds in between.",[N("len","Length",20),N("lvl","Level",100)],p=>p.len*3,(d,p)=>{const c=cciArr(d,p.len);let pos=0;return c.map(v=>{if(v>p.lvl)pos=1;else if(v<-p.lvl)pos=-1;return pos})});
-add("rsi50",MO,"RSI trend (50 line)","Long when RSI is above 50 plus a buffer, short below 50 minus the buffer, holds in between.",[N("len","RSI length",14),N("band","Buffer",5)],p=>p.len*4,(d,p)=>{const r=rsi(d.c,p.len);let pos=0;return r.map(v=>{if(v>50+p.band)pos=1;else if(v<50-p.band)pos=-1;return pos})});
-add("fisher",MO,"Fisher Transform","Long when the Fisher line crosses above its one-candle-ago value, short when below.",[N("len","Length",10)],p=>p.len*4,(d,p)=>{const hl=d.c.map((_,i)=>(d.h[i]+d.l[i])/2),hh=hhv(hl,p.len),ll=llv(hl,p.len);let v=0,f=0;return hl.map((x,i)=>{const r=hh[i]===ll[i]?0:(x-ll[i])/(hh[i]-ll[i])-0.5;v=Math.max(-0.999,Math.min(0.999,0.66*r+0.67*v));const pf=f;f=0.5*Math.log((1+v)/(1-v))+0.5*f;return sgn(f-pf)})});
-add("elder",MO,"Elder Ray","Long when the EMA rises and bear power is negative but improving, short on the mirror image.",[N("len","EMA length",13)],p=>p.len*3,(d,p)=>{const e=ema(d.c,p.len);let pos=0;return d.c.map((_,i)=>{if(i<1)return 0;const bull=d.h[i]-e[i],bear=d.l[i]-e[i],pb=d.h[i-1]-e[i-1],pr=d.l[i-1]-e[i-1];if(e[i]>e[i-1]&&bear<0&&bear>pr)pos=1;else if(e[i]<e[i-1]&&bull>0&&bull<pb)pos=-1;return pos})});
-add("force",MO,"Force Index","Long while the smoothed price-times-volume force is above zero.",[N("len","EMA length",13)],p=>p.len*3,(d,p)=>{const f=d.c.map((c,i)=>i?(c-d.c[i-1])*d.v[i]:0);return ema(f,p.len).map(sgn)});
-add("obv",MO,"On-Balance Volume trend","Long while OBV is above its own EMA, short while below.",[N("len","EMA length",50)],p=>p.len*2,(d,p)=>{const o=[0];for(let i=1;i<d.c.length;i++)o.push(o[i-1]+sgn(d.c[i]-d.c[i-1])*d.v[i]);const e=ema(o,p.len);return o.map((v,i)=>sgn(v-e[i]))});
-add("cmf",MO,"Chaikin Money Flow","Long when money flow is above the threshold, short below minus the threshold, holds in between.",[N("len","Length",20),N("th","Threshold",0.05,.01)],p=>p.len*3,(d,p)=>{const mfv=d.c.map((c,i)=>{const r=d.h[i]-d.l[i];return r===0?0:((2*c-d.h[i]-d.l[i])/r)*d.v[i]}),a=sma(mfv,p.len),b=sma(d.v,p.len);let pos=0;return a.map((v,i)=>{const x=b[i]?v/b[i]:0;if(x>p.th)pos=1;else if(x<-p.th)pos=-1;return pos})});
-add("vwap",MO,"Rolling VWAP","Long while the close is above the volume-weighted average price of the last N candles.",[N("len","Candles",100)],p=>p.len*2,(d,p)=>{const tp=typ(d),a=sma(tp.map((v,i)=>v*d.v[i]),p.len),b=sma(d.v,p.len);return d.c.map((c,i)=>b[i]?sgn(c-a[i]/b[i]):0)});
+/* Bands and breakouts */
+add("nwe",BB,"Nadaraya-Watson Envelope [LuxAlgo]","Gaussian kernel envelope (non-repainting mode). Buy a close below the lower band, sell a close above the upper band.",
+  [N("h","Bandwidth",8),N("mult","Multiplier",3,.1),SEL("exit","Exit","opp",[["opp","Opposite signal"],["mid","Back at the middle line"]])],
+  p=>500,(d,p)=>{const c=d.c,L=c.length,w=[];for(let i=0;i<500;i++){const x=Math.exp(-(i*i)/(p.h*p.h*2));if(x<1e-10)break;w.push(x)}
+    const out=c.map((_,i)=>{let s=0,ws=0;for(let k=0;k<w.length&&k<=i;k++){s+=c[i-k]*w[k];ws+=w[k]}return s/ws}),mae=sma(c.map((x,i)=>Math.abs(x-out[i])),499).map(v=>v*p.mult);
+    return hold(L,(i,pos)=>{if(!i)return;const u=out[i]+mae[i],l=out[i]-mae[i],pu=out[i-1]+mae[i-1],pl=out[i-1]-mae[i-1];
+      if(c[i]<l&&c[i-1]>=pl)return 1;if(c[i]>u&&c[i-1]<=pu)return -1;
+      if(p.exit==="mid"&&((pos===1&&c[i]>=out[i])||(pos===-1&&c[i]<=out[i])))return 0})});
+add("tlb",BB,"Trendlines with Breaks [LuxAlgo]","Sloped trendlines from pivots. Long when price breaks the down-sloping upper line, short when it breaks the lower line.",
+  [N("len","Swing length",14),N("mult","Slope",1,.1)],
+  p=>p.len*4,(d,p)=>{const n=Math.max(1,Math.round(p.len)),ph=pivots(d.h,n,n,true),pl=pivots(d.l,n,n,false),A=atr(d,n);let up=0,lo=0,sph=0,spl=0,upos=0,dnos=0,sH=false,sL=false;
+    return hold(d.c.length,i=>{const slope=A[i]/n*p.mult,hH=!isNaN(ph[i]),hL=!isNaN(pl[i]);
+      if(hH){sph=slope;up=ph[i];sH=true}else up-=sph;
+      if(hL){spl=slope;lo=pl[i];sL=true}else lo+=spl;
+      const pu=upos,pd=dnos;upos=hH?0:d.c[i]>up-sph*n?1:upos;dnos=hL?0:d.c[i]<lo+spl*n?1:dnos;
+      if(sH&&upos>pu)return 1;if(sL&&dnos>pd)return -1})});
+add("srb",BB,"Support and Resistance Levels with Breaks [LuxAlgo]","Pivot support and resistance. Long on a close above resistance, short on a close below support, both with rising volume.",
+  [N("lb","Left bars",15),N("rb","Right bars",15),N("vt","Volume threshold",20)],
+  p=>(p.lb+p.rb)*3,(d,p)=>{const ph=pivots(d.h,p.lb,p.rb,true),pl=pivots(d.l,p.lb,p.rb,false),L=d.c.length,hp=new Array(L).fill(NaN),lp=new Array(L).fill(NaN);
+    for(let i=1;i<L;i++){hp[i]=!isNaN(ph[i-1])?ph[i-1]:hp[i-1];lp[i]=!isNaN(pl[i-1])?pl[i-1]:lp[i-1]}
+    const vs=ema(d.v,5),vl=ema(d.v,10),osc=vs.map((v,i)=>vl[i]?100*(v-vl[i])/vl[i]:0);
+    return hold(L,i=>{if(i<2)return;const c=d.c[i],c1=d.c[i-1],o=d.o[i];
+      if(c>hp[i]&&c1<=hp[i-1]&&!(o-d.l[i]>c-o)&&osc[i]>p.vt)return 1;
+      if(c<lp[i]&&c1>=lp[i-1]&&!(o-c<d.h[i]-o)&&osc[i]>p.vt)return -1})});
 
-/* Reversal */
-add("stoch",RV,"Stochastic reversal","Long when %K crosses back above the oversold level, short when it crosses back below overbought.",[N("len","%K length",14),N("sm","Smoothing",3),N("lo","Oversold",20),N("hi","Overbought",80),SEL("mid","Exit at 50","1",[["1","Yes"],["0","No, reverse only"]])],p=>p.len*4,(d,p)=>{const hh=hhv(d.h,p.len),ll=llv(d.l,p.len),raw=d.c.map((c,i)=>hh[i]===ll[i]?50:(c-ll[i])/(hh[i]-ll[i])*100);return revCross(sma(raw,p.sm),p.lo,p.hi,50,p.mid==="1")});
-add("stochrsi",RV,"Stochastic RSI reversal","Stochastic of RSI. Faster than RSI itself. Long on a cross back above oversold, short below overbought.",[N("len","RSI length",14),N("k","Stoch length",14),N("lo","Oversold",20),N("hi","Overbought",80),SEL("mid","Exit at 50","1",[["1","Yes"],["0","No, reverse only"]])],p=>(p.len+p.k)*4,(d,p)=>{const r=rsi(d.c,p.len),hh=hhv(r,p.k),ll=llv(r,p.k),raw=r.map((v,i)=>hh[i]===ll[i]?50:(v-ll[i])/(hh[i]-ll[i])*100);return revCross(sma(raw,3),p.lo,p.hi,50,p.mid==="1")});
-add("williams",RV,"Williams %R reversal","Long when %R crosses back above -80, short when it crosses back below -20.",[N("len","Length",14),N("lo","Oversold",-80),N("hi","Overbought",-20),SEL("mid","Exit at -50","1",[["1","Yes"],["0","No, reverse only"]])],p=>p.len*4,(d,p)=>{const hh=hhv(d.h,p.len),ll=llv(d.l,p.len),w=d.c.map((c,i)=>hh[i]===ll[i]?-50:-100*(hh[i]-c)/(hh[i]-ll[i]));return revCross(w,p.lo,p.hi,-50,p.mid==="1")});
-add("mfi",RV,"Money Flow Index reversal","Volume-weighted RSI. Long on a cross back above 20, short on a cross back below 80.",[N("len","Length",14),N("lo","Oversold",20),N("hi","Overbought",80),SEL("mid","Exit at 50","1",[["1","Yes"],["0","No, reverse only"]])],p=>p.len*4,(d,p)=>{const tp=typ(d),pos=[0],neg=[0];for(let i=1;i<tp.length;i++){const mf=tp[i]*d.v[i];pos.push(tp[i]>tp[i-1]?mf:0);neg.push(tp[i]<tp[i-1]?mf:0)}const a=sma(pos,p.len),b=sma(neg,p.len);return revCross(a.map((v,i)=>b[i]===0?100:100-100/(1+v/b[i])),p.lo,p.hi,50,p.mid==="1")});
-add("rsi2",RV,"Connors RSI(2)","Buy a very oversold dip while price is above its 200 SMA, sell a spike while below. Exit when RSI recovers.",[N("len","RSI length",2),N("lo","Entry level",10),N("exit","Exit level",70),N("trend","Trend SMA",200)],p=>p.trend+5,(d,p)=>{const r=rsi(d.c,p.len),e=sma(d.c,p.trend);let pos=0;return d.c.map((c,i)=>{if(i<p.trend)return 0;if(c>e[i]&&r[i]<p.lo)pos=1;else if(c<e[i]&&r[i]>100-p.lo)pos=-1;else if(pos===1&&r[i]>p.exit)pos=0;else if(pos===-1&&r[i]<100-p.exit)pos=0;return pos})});
-add("ccirev",RV,"CCI reversal","Long when CCI crosses back above -level, short when it crosses back below +level, exit at zero.",[N("len","Length",20),N("lvl","Level",100)],p=>p.len*3,(d,p)=>revCross(cciArr(d,p.len),-p.lvl,p.lvl,0,true));
-add("bbrev",RV,"Bollinger reversion","Long when price closes below the lower band, short above the upper, exit at the middle band.",[N("len","Length",20),N("k","Std deviations",2,.1)],p=>p.len*2,(d,p)=>{const b=bands(d.c,p.len,p.k);let pos=0;return d.c.map((c,i)=>{if(c<b.l[i])pos=1;else if(c>b.u[i])pos=-1;else if(pos===1&&c>b.m[i])pos=0;else if(pos===-1&&c<b.m[i])pos=0;return pos})});
-add("zscore",RV,"Z-score reversion","Long when price is N standard deviations below its average, short above, exit at the average.",[N("len","Average length",50),N("k","Entry z-score",2,.1)],p=>p.len*2,(d,p)=>{const m=sma(d.c,p.len),s=stdev(d.c,p.len);let pos=0;return d.c.map((c,i)=>{const z=s[i]?(c-m[i])/s[i]:0;if(z<-p.k)pos=1;else if(z>p.k)pos=-1;else if(pos===1&&z>=0)pos=0;else if(pos===-1&&z<=0)pos=0;return pos})});
-add("rsibb",RV,"RSI + Bollinger reversal","Needs both: price outside the band and RSI extreme. Exit at the middle band.",[N("len","Band length",20),N("k","Std deviations",2,.1),N("rl","RSI length",14),N("lvl","RSI level",30)],p=>Math.max(p.len,p.rl)*4,(d,p)=>{const b=bands(d.c,p.len,p.k),r=rsi(d.c,p.rl);let pos=0;return d.c.map((c,i)=>{if(c<b.l[i]&&r[i]<p.lvl)pos=1;else if(c>b.u[i]&&r[i]>100-p.lvl)pos=-1;else if(pos===1&&c>b.m[i])pos=0;else if(pos===-1&&c<b.m[i])pos=0;return pos})});
-
-/* Filtered combos */
-add("macdema",CB,"MACD + EMA trend filter","MACD cross, but only longs above the EMA and only shorts below it.",[N("fast","MACD fast",12),N("slow","MACD slow",26),N("sig","Signal",9),N("trend","Trend EMA",200)],p=>p.trend*2,(d,p)=>{const a=ema(d.c,p.fast),b=ema(d.c,p.slow),m=a.map((v,i)=>v-b[i]),s=ema(m,p.sig),e=ema(d.c,p.trend);return d.c.map((c,i)=>c>e[i]&&m[i]>s[i]?1:c<e[i]&&m[i]<s[i]?-1:0)});
-add("emaadx",CB,"EMA cross + ADX filter","EMA cross, but flat whenever ADX says there is no trend.",[N("fast","Fast EMA",21),N("slow","Slow EMA",55),N("len","ADX length",14),N("th","ADX threshold",20)],p=>Math.max(p.fast,p.slow)*2,(d,p)=>{const f=ema(d.c,p.fast),s=ema(d.c,p.slow),m=dmi(d,p.len);return d.c.map((_,i)=>m.adx[i]>p.th?sgn(f[i]-s[i]):0)});
-add("stema",CB,"Supertrend + EMA filter","Supertrend direction, but only longs above the EMA and only shorts below it.",[N("len","ATR length",10),N("mult","Multiplier",3,.1),N("trend","Trend EMA",200)],p=>p.trend*2,(d,p)=>{const st=supertrend(d,p.len,p.mult),e=ema(d.c,p.trend);return d.c.map((c,i)=>c>e[i]?(st[i]===1?1:0):(st[i]===-1?-1:0))});
-add("ceema",CB,"Chandelier Exit + EMA filter","Chandelier Exit flips, but only longs above the EMA and only shorts below it.",[N("period","ATR period",22),N("mult","Multiplier",3,.1),N("trend","Trend EMA",200)],p=>p.trend*2,(d,p)=>{const ce=STRATS.ce.run(d,{period:p.period,mult:p.mult,useClose:"1"}),e=ema(d.c,p.trend);return d.c.map((c,i)=>c>e[i]?(ce[i]===1?1:0):(ce[i]===-1?-1:0))});
-add("rsipull",CB,"Trend pullback (EMA + RSI)","Buy RSI dips inside an uptrend, sell RSI spikes inside a downtrend, exit when RSI normalises.",[N("trend","Trend EMA",200),N("len","RSI length",14),N("lvl","Dip level",40)],p=>p.trend*2,(d,p)=>{const e=ema(d.c,p.trend),r=rsi(d.c,p.len);let pos=0;return d.c.map((c,i)=>{if(c>e[i]&&r[i]<p.lvl)pos=1;else if(c<e[i]&&r[i]>100-p.lvl)pos=-1;else if(pos===1&&(r[i]>70||c<e[i]))pos=0;else if(pos===-1&&(r[i]<30||c>e[i]))pos=0;return pos})});
-
+/* Machine learning */
+add("lorentzian",ML,"Machine Learning: Lorentzian Classification [jdehorty]","Nearest-neighbour vote on RSI, WaveTrend, CCI and ADX features, with the volatility, regime and kernel filters. Trained on the previous candles only. Slower than the others.",
+  [N("k","Neighbours",8),N("win","Training candles",2000),N("feats","Features (2-5)",5),YN("vf","Volatility filter","1"),YN("rf","Regime filter","1"),YN("kf","Kernel filter","1"),
+    SEL("exit","Exit","4",[["4","After 4 candles (script default)"],["opp","Only on the opposite signal"]])],
+  p=>400,(d,p)=>lorentzian(d,p));
 
 /* ---------- state ---------- */
-const DEF={sym:"BTCUSDT",tf:"240",bars:"10000",strat:"ema2",params:{},
+const DEF={sym:"BTCUSDT",tf:"240",bars:"10000",strat:"supertrend",params:{},
   cfg:{dirMode:"both",capital:1000,size:100,lev:1,fee:0.055,slip:0.02,sl:0,tp:0}};
 let S=JSON.parse(JSON.stringify(DEF));
 try{const x=JSON.parse(localStorage.getItem("trial.v1")||"null");if(x){S={...S,...x,cfg:{...S.cfg,...(x.cfg||{})}}}}catch(e){}
@@ -617,9 +762,8 @@ async function load(){
 (function init(){
   $("#sym").innerHTML=SYMS.map(s=>`<option value="${s}">${s.replace("USDT","")}/USDT</option>`).join("");
   $("#sym").value=S.sym;$("#bars").value=S.bars;
-  const order=["Moving averages","Trend and breakout","Momentum and volume","Reversal","Filtered combos"];
-  $("#strat").innerHTML=order.map(cat=>`<optgroup label="${cat}">`+Object.keys(STRATS).filter(k=>STRATS[k].cat===cat).map(k=>`<option value="${k}">${STRATS[k].name}</option>`).join("")+`</optgroup>`).join("");
-  if(!STRATS[S.strat])S.strat="ema2";
+  $("#strat").innerHTML=CATS.map(cat=>`<optgroup label="${cat}">`+Object.keys(STRATS).filter(k=>STRATS[k].cat===cat).map(k=>`<option value="${k}">${STRATS[k].name}</option>`).join("")+`</optgroup>`).join("");
+  if(!STRATS[S.strat])S.strat="supertrend";
   $("#strat").value=S.strat;
   const tf=$("#tfs");
   tf.innerHTML=TFS.map(t=>`<button class="pill" data-tf="${t[1]}" aria-pressed="${t[1]===S.tf}">${t[0]}</button>`).join("");

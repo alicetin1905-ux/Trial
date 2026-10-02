@@ -6,7 +6,12 @@ Open `index.html` in a browser, or host it on GitHub Pages.
 
 ## Features
 
-- 55 strategies in five groups: moving averages, trend and breakout, momentum and volume, reversal, and filtered combos
+- 32 strategies ported from the most popular TradingView community scripts, in four groups:
+  - Trend following: Supertrend, UT Bot Alerts, Chandelier Exit, Chandelier Exit + ZLSMA, HalfTrend, Pivot Point SuperTrend, Range Filter, Twin Range Filter, SSL Channel, Hull Suite, OTT, MOST, AlphaTrend, Trend Magic, Coral Trend, MavilimW, Tillson T3, Gaussian Channel, Smoothed Heiken Ashi, Ehlers Instantaneous Trendline
+  - Momentum: Squeeze Momentum, WaveTrend, QQE MOD, MACD Custom (ChrisMoody), Waddah Attar Explosion, Schaff Trend Cycle, Volume Flow Indicator, Williams Vix Fix
+  - Bands and breakouts: Nadaraya-Watson Envelope (non-repainting), Trendlines with Breaks, Support and Resistance Levels with Breaks
+  - Machine learning: Lorentzian Classification
+- Each strategy uses the original script's default settings, except Chandelier Exit, which starts at 4 / 2. The script author is shown in the strategy name.
 - Symbols: BTC, ETH, SOL, XRP, DOGE, BNB, LINK, AVAX (USDT perps)
 - Timeframes: 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, with up to 20,000 candles
 - Editable settings for every strategy
