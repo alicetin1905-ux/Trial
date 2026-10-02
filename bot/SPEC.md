@@ -44,8 +44,11 @@ Inputs are limited to data that can be **rebuilt historically with exact timesta
 | Trend: EMA slope on 1h and 4h, distance from EMA in ATRs, ADX | klines | yes |
 | Pullback depth (from swing high/low, in ATRs), RSI(14) on 15m | klines | yes |
 | Order flow: signed taker volume imbalance over 15m and 1h, trade-count z-score | Bybit public trade archive (`public.bybit.com/trading`) | yes, daily files |
-| Funding rate, hours to next funding | funding history API | yes |
+| Hours to next funding | clock | yes |
+| Funding rate | funding history API | **deferred**: the API is geo-blocked from the cloud build, so there is no history yet. It's added on the Mac Mini as a gated strategy change |
 | Spread, top-10 book imbalance | live websocket only | **no** |
+
+The exact v1 feature list (19 numeric features) is `FEATURES` in `src/jevbot/state/snapshot.py`.
 
 Spread and book imbalance have no reliable free history, so **Jev does not see them in v1**. They are logged live from day 1 and used only in a deterministic veto: no entry when the spread is above a set number of bps. Once enough live history has built up, adding them to the snapshot becomes a strategy change that has to clear the gates again.
 

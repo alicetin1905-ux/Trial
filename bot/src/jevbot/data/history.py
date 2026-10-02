@@ -73,7 +73,12 @@ def build(
     out = Path(data_dir) / symbol
     out.mkdir(parents=True, exist_ok=True)
     todo = [d for d in days_between(start, end) if not (out / f"{d}.parquet").exists()]
-    report: dict = {"built": 0, "skipped": len(days_between(start, end)) - len(todo), "missing": [], "failed": []}
+    report: dict = {
+        "built": 0,
+        "skipped": len(days_between(start, end)) - len(todo),
+        "missing": [],
+        "failed": [],
+    }
     with ThreadPoolExecutor(max_workers=workers) as pool, open(out / "manifest.jsonl", "a") as manifest:
         futures = {pool.submit(_process, symbol, d, out, fetch): d for d in todo}
         for n, fut in enumerate(as_completed(futures), 1):
@@ -97,7 +102,9 @@ def build(
     return report
 
 
-def load_bars15(data_dir: Path, symbol: str, start: str, end: str) -> tuple[pd.DataFrame, list[tuple[int, int]]]:
+def load_bars15(
+    data_dir: Path, symbol: str, start: str, end: str
+) -> tuple[pd.DataFrame, list[tuple[int, int]]]:
     """Load the continuous 15m series for [start, end] and report any gaps (missing days)."""
     out = Path(data_dir) / symbol
     files = [out / f"{d}.parquet" for d in days_between(start, end)]
