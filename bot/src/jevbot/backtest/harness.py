@@ -30,6 +30,7 @@ from jevbot.backtest.metrics import (
 from jevbot.backtest.trials import TrialLog
 from jevbot.backtest.walkforward import DESIGN_END, DESIGN_START, folds, select_and_stitch
 from jevbot.data.bars import find_gaps, resample
+from jevbot.data.bars1h_file import load_1h
 from jevbot.data.history import load_bars15
 from jevbot.state.features import atr
 from jevbot.state.snapshot import BAR_MS as SNAP_BAR_MS
@@ -37,6 +38,7 @@ from jevbot.state.snapshot import WARMUP_BARS, compute_features
 from jevbot.strategy.params import RuleParams, grid, params_hash
 
 EQUITY0 = 10_000.0
+HISTORY_1H = Path(__file__).resolve().parents[3] / "history" / "BTCUSDT_1h.parquet"
 
 
 @dataclass
@@ -87,19 +89,25 @@ def oos_evaluate(runs: dict[str, ConfigRun], log: TrialLog, label: str) -> dict:
         min_parts.append(runs[p].daily_min_ret.loc[s:e])
         tr = runs[p].trades
         trade_parts.append(tr[(tr.entry_day >= s) & (tr.entry_day <= e)])
-    oos_min = pd.concat(min_parts)
+    m = metrics_from_parts(oos, pd.concat(min_parts), trade_parts, log.trial_sharpes(), label)
+    return m | {"picks": picks, "fold_tests": tests}
+
+
+def metrics_from_parts(
+    oos: pd.Series, oos_min: pd.Series, trade_parts: list[pd.DataFrame], trial_srs: list[float], label: str
+) -> dict:
+    """Gate metrics from stitched out-of-sample daily returns, intraday minimums and trades."""
     oos_trades = pd.concat(trade_parts) if trade_parts else pd.DataFrame(columns=["ret"])
     r = oos.to_numpy()
     closes = np.cumprod(1 + r)
     prev = np.concatenate([[1.0], closes[:-1]])
     mins = prev * (1 + oos_min.to_numpy())
     sr_d = sharpe_daily(r)
-    trial_srs = log.trial_sharpes()
     m = {
         "label": label,
         "sharpe": sharpe_annual(r),
         "sharpe_daily": sr_d,
-        "max_dd": max_drawdown(closes, mins),
+        "max_dd": max_drawdown(closes, mins) if len(closes) else 0.0,
         "hit_rate": hit_rate(oos_trades["ret"].to_numpy()),
         "t_stat": t_stat(oos_trades["ret"].to_numpy()),
         "n_trades": len(oos_trades),
@@ -107,10 +115,10 @@ def oos_evaluate(runs: dict[str, ConfigRun], log: TrialLog, label: str) -> dict:
         "skew": float(skew(r)) if len(r) > 2 else 0.0,
         "kurt": float(kurtosis(r, fisher=False)) if len(r) > 3 else 3.0,
         "n_trials": len(trial_srs),
-        "picks": picks,
-        "fold_tests": tests,
     }
-    m["deflated_sharpe"] = deflated_sharpe(sr_d, len(r), m["skew"], m["kurt"], trial_srs)
+    m["deflated_sharpe"] = (
+        deflated_sharpe(sr_d, len(r), m["skew"], m["kurt"], trial_srs) if len(r) > 1 else 0.0
+    )
     m["avg_trade_ret"] = float(oos_trades["ret"].mean()) if len(oos_trades) else 0.0
     return m
 
@@ -121,9 +129,16 @@ def oos_evaluate(runs: dict[str, ConfigRun], log: TrialLog, label: str) -> dict:
 def load_design(
     data_dir: Path, symbol: str = "BTCUSDT", start: str = "2020-09-01"
 ) -> tuple[pd.DataFrame, list]:
-    """1h bars (built from the 15m history) for warm-up + design period. Never reads past DESIGN_END."""
-    bars15, _ = load_bars15(data_dir, symbol, start, DESIGN_END)
-    bars = resample(bars15, 60)
+    """1h bars for warm-up + design period. Never reads past DESIGN_END.
+
+    Built from the 15m history in data_dir when it exists, else read from the committed,
+    checksummed history/BTCUSDT_1h.parquet.
+    """
+    if (Path(data_dir) / symbol).exists():
+        bars15, _ = load_bars15(data_dir, symbol, start, DESIGN_END)
+        bars = resample(bars15, 60)
+    else:
+        bars = load_1h(HISTORY_1H, start=start, end=DESIGN_END)
     return bars, find_gaps(bars, SNAP_BAR_MS)
 
 

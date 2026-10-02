@@ -14,3 +14,5 @@ HALT
 .pytest_cache/
 .ruff_cache/
 .hypothesis/
+reports/*FAKE*
+reports/trials_fake.jsonl

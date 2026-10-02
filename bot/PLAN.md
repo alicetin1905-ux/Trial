@@ -1,6 +1,6 @@
 # Plan (phase 3 of 6, approved)
 
-Status: **APPROVED 2026-10-02.** Build in progress: M0 done. It implements the approved `SPEC.md` and `ARCHITECTURE.md`.
+Status: **APPROVED 2026-10-02.** Build: M0–M6 done; M7 rules-only baselines FAIL (see reports/); Jev gate run ready, needs TYPESAFE_API_KEY. It implements the approved `SPEC.md` and `ARCHITECTURE.md`.
 
 ## Ground rules for every task
 

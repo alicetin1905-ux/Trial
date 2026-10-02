@@ -211,6 +211,7 @@ class FoldPick:
     part: ConfigRun | None
     log: FilterLog | None
     model: tuple[JevParams, Calibrator] | None
+    is_sharpes: dict | None = None  # every config's training-window Sharpe (for the trial log)
 
 
 def _ms(day: str) -> int:
@@ -256,7 +257,7 @@ def walk_forward_jev(
 
     picks: list[FoldPick] = []
     for train_start, train_end, test_start, test_end in folds():
-        best = FoldPick((test_start, test_end), None, -np.inf, None, None, None)
+        best = FoldPick((test_start, test_end), None, -np.inf, None, None, None, {})
         for p in configs:
             k = params_hash(p)
             s = samples[k]
@@ -265,8 +266,9 @@ def walk_forward_jev(
                 continue
             is_run, _ = window(train_start, train_end, p, model)
             is_sr = sharpe_daily(is_run.daily_ret.to_numpy())
+            best.is_sharpes[k] = is_sr
             if is_sr > best.is_sharpe:
-                best = FoldPick((test_start, test_end), k, is_sr, None, None, model)
+                best = FoldPick((test_start, test_end), k, is_sr, None, None, model, best.is_sharpes)
         if best.config is not None:
             p = next(c for c in configs if params_hash(c) == best.config)
             best.part, best.log = window(test_start, test_end, p, best.model)
