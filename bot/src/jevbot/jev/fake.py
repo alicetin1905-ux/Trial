@@ -25,8 +25,8 @@ class FakeJev:
 
     async def ask(self, snapshot: dict[str, float], side: int) -> JevResult:
         g = snapshot.get
-        trend = g("ema50_slope_1h_atr", 0.0) + 0.5 * g("dist_ema50_4h_atr", 0.0)
-        vol = g("rv_ratio_4h_3d", 1.0)
+        trend = g("ema50_slope_4h_atr", 0.0) + 0.5 * g("dist_sma50_1d_atr", 0.0)
+        vol = g("rv_ratio_24h_7d", 1.0)
         regime = _softmax(
             {
                 "trending_up": trend,
@@ -35,10 +35,10 @@ class FakeJev:
                 "high_vol_chop": vol - 1.2,
             }
         )
-        mom = g("ret_4h_z", 0.0) + g("flow_imb_1h", 0.0)
+        mom = g("ret_24h_z", 0.0) + g("flow_imb_4h", 0.0)
         direction = _softmax({"up": mom, "down": -mom, "flat": 0.3})
-        pressure = 1 / (1 + math.exp(-4 * (g("flow_imb_15m", 0.0) + g("flow_imb_1h", 0.0))))
-        q = max(0.0, min(4.0, 2.0 + side * trend - abs(g("pullback_6h_atr1h", 1.5) - 1.75)))
+        pressure = 1 / (1 + math.exp(-4 * (g("flow_imb_1h", 0.0) + g("flow_imb_4h", 0.0))))
+        q = max(0.0, min(4.0, 2.0 + side * trend - abs(g("pullback_24h_atr", 1.5) - 1.75)))
         lo = int(q)
         probs = {str(i): 0.0 for i in range(5)}
         probs[str(lo)] = round(1 - (q - lo), 6)

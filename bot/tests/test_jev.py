@@ -12,16 +12,16 @@ from jevbot.jev.questions import QUESTION_NAMES, build_state, load_questions
 ROOT = Path(__file__).resolve().parents[1]
 QUESTIONS = ROOT / "active" / "questions.yaml"
 SNAP = {
-    "ret_15m_z": 0.1,
-    "ema50_slope_1h_atr": 0.4,
-    "dist_ema50_4h_atr": 1.2,
-    "pullback_6h_atr1h": 1.6,
-    "rsi14_15m": 31.0,
-    "flow_imb_15m": 0.2,
+    "ret_1h_z": 0.1,
+    "ema50_slope_4h_atr": 0.4,
+    "dist_sma50_1d_atr": 1.2,
+    "pullback_24h_atr": 1.6,
+    "rsi14_1h": 31.0,
+    "flow_imb_4h": 0.2,
     "flow_imb_1h": 0.1,
-    "rv_ratio_4h_3d": 0.9,
-    "trade_count_z_15m": 0.3,
-    "adx14_1h": 28.0,
+    "rv_ratio_24h_7d": 0.9,
+    "trade_count_z_1h": 0.3,
+    "adx14_4h": 28.0,
 }
 
 
@@ -229,10 +229,10 @@ def test_cached_answer_from_another_model_is_not_reused(tmp_path):
 def test_ask_many_respects_concurrency_and_keeps_order(tmp_path):
     srv = Server()
     c = _client(srv, profile="backtest", cache=JevCache(tmp_path / "c.sqlite"))
-    snaps = [SNAP | {"ret_15m_z": i / 10} for i in range(12)]
+    snaps = [SNAP | {"ret_1h_z": i / 10} for i in range(12)]
     out = run(c.ask_many([(s, 1) for s in snaps], concurrency=3))
     assert len(out) == 12 and all(isinstance(r, JevResult) for r in out)
-    assert [json.loads(json.dumps(r.state["features"]))["ret_15m_z"] for r in out] == [
+    assert [json.loads(json.dumps(r.state["features"]))["ret_1h_z"] for r in out] == [
         i / 10 for i in range(12)
     ]
 
@@ -264,7 +264,7 @@ def test_ask_many_is_rate_limited(tmp_path):
     import time as _t
 
     c = _client(Server(), profile="backtest", cache=JevCache(tmp_path / "c.sqlite"))
-    snaps = [(SNAP | {"ret_15m_z": i / 100}, 1) for i in range(11)]
+    snaps = [(SNAP | {"ret_1h_z": i / 100}, 1) for i in range(11)]
     t0 = _t.perf_counter()
     run(c.ask_many(snaps, concurrency=8, rate_per_s=50.0))
     assert _t.perf_counter() - t0 >= 10 / 50.0 * 0.95  # 11 starts need >= 10 intervals of 20 ms
@@ -275,7 +275,7 @@ def test_cache_hits_do_not_consume_rate_budget(tmp_path):
 
     cache = JevCache(tmp_path / "c.sqlite")
     c = _client(Server(), profile="backtest", cache=cache)
-    snaps = [(SNAP | {"ret_15m_z": i / 100}, 1) for i in range(11)]
+    snaps = [(SNAP | {"ret_1h_z": i / 100}, 1) for i in range(11)]
     run(c.ask_many(snaps, concurrency=8, rate_per_s=50.0))
     t0 = _t.perf_counter()
     run(c.ask_many(snaps, concurrency=8, rate_per_s=5.0))

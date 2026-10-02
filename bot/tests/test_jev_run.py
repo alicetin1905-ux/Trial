@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from conftest import make_bars15
+from conftest import make_bars1h
 
 import jevbot.backtest.jev_run as jr
 from jevbot.backtest.engine import CostModel, EngineState
@@ -22,8 +22,8 @@ START_2020_09 = 1598918400000
 
 @pytest.fixture(scope="module")
 def world():
-    """~5.3 years of synthetic 15m bars (2020-09 -> 2025-12), features, ATR and fake-Jev answers."""
-    bars = make_bars15(int(5.33 * 365 * 96), seed=11, start=START_2020_09, vol=0.003)
+    """~5.3 years of synthetic 1h bars (2020-09 -> 2025-12), features, ATR and fake-Jev answers."""
+    bars = make_bars1h(int(5.33 * 365 * 24), seed=11, start=START_2020_09, vol=0.006)
     feats, atr15 = prepare(bars, [])
     configs = [grid()[0], grid()[-1]]
     calls = jr.plan_calls(bars, feats, configs, sample_frac=0.01)
@@ -74,7 +74,7 @@ def _strategy(p_cutoff=0.5):
 
 
 def test_filter_vetoes_on_jev_failure_and_counts_it():
-    bars = make_bars15(10)
+    bars = make_bars1h(10)
     t0 = int(bars.available_at[0])
     log = jr.FilterLog(vetoes={})
     cal = Calibrator("isotonic", {"x": [-5.0, 5.0], "y": [0.99, 0.99]})

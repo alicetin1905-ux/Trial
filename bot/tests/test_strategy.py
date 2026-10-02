@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from conftest import make_bars15
+from conftest import make_bars1h
 
 from jevbot.state.snapshot import WARMUP_BARS, compute_features
 from jevbot.strategy.params import ParamError, RuleParams, grid, load_strategy_md, params_hash
@@ -38,11 +38,11 @@ def _rules(**kw) -> RuleParams:
 def _feat(**kw) -> pd.DataFrame:
     row = dict(
         t=0,
-        ema50_slope_1h_atr=0.3,
-        dist_ema50_4h_atr=1.0,
-        pullback_6h_atr1h=1.5,
-        bounce_6h_atr1h=0.2,
-        rsi14_15m=30.0,
+        ema50_slope_4h_atr=0.3,
+        dist_sma50_1d_atr=1.0,
+        pullback_24h_atr=1.5,
+        bounce_24h_atr=0.2,
+        rsi14_1h=30.0,
     )
     return pd.DataFrame([row | kw])
 
@@ -90,8 +90,8 @@ def test_grid_is_54_unique_configs_with_stable_hashes():
 
 def test_trend_requires_1h_slope_and_4h_side_to_agree():
     assert trend_dir(_feat()).iloc[0] == 1
-    assert trend_dir(_feat(ema50_slope_1h_atr=-0.3, dist_ema50_4h_atr=-1.0)).iloc[0] == -1
-    assert trend_dir(_feat(ema50_slope_1h_atr=0.3, dist_ema50_4h_atr=-1.0)).iloc[0] == 0
+    assert trend_dir(_feat(ema50_slope_4h_atr=-0.3, dist_sma50_1d_atr=-1.0)).iloc[0] == -1
+    assert trend_dir(_feat(ema50_slope_4h_atr=0.3, dist_sma50_1d_atr=-1.0)).iloc[0] == 0
 
 
 def test_long_candidate_in_uptrend_pullback_with_low_rsi():
@@ -101,10 +101,10 @@ def test_long_candidate_in_uptrend_pullback_with_low_rsi():
 @pytest.mark.parametrize(
     "kw",
     [
-        {"pullback_6h_atr1h": 0.5},  # too shallow
-        {"pullback_6h_atr1h": 3.0},  # too deep: structure broken
-        {"rsi14_15m": 45.0},  # not oversold enough
-        {"dist_ema50_4h_atr": -1.0},  # trends disagree
+        {"pullback_24h_atr": 0.5},  # too shallow
+        {"pullback_24h_atr": 3.0},  # too deep: structure broken
+        {"rsi14_1h": 45.0},  # not oversold enough
+        {"dist_sma50_1d_atr": -1.0},  # trends disagree
     ],
 )
 def test_no_long_candidate_when_a_condition_fails(kw):
@@ -113,23 +113,23 @@ def test_no_long_candidate_when_a_condition_fails(kw):
 
 def test_short_candidate_mirrors_long():
     f = _feat(
-        ema50_slope_1h_atr=-0.3,
-        dist_ema50_4h_atr=-1.0,
-        bounce_6h_atr1h=1.5,
-        pullback_6h_atr1h=0.1,
-        rsi14_15m=70,
+        ema50_slope_4h_atr=-0.3,
+        dist_sma50_1d_atr=-1.0,
+        bounce_24h_atr=1.5,
+        pullback_24h_atr=0.1,
+        rsi14_1h=70,
     )
     assert candidates(f, _rules()).iloc[0] == -1
     assert candidates(f, _rules(direction="long")).iloc[0] == 0
 
 
 def test_pullback_bounds_are_inclusive():
-    assert candidates(_feat(pullback_6h_atr1h=1.0), _rules()).iloc[0] == 1
-    assert candidates(_feat(pullback_6h_atr1h=2.5), _rules()).iloc[0] == 1
+    assert candidates(_feat(pullback_24h_atr=1.0), _rules()).iloc[0] == 1
+    assert candidates(_feat(pullback_24h_atr=2.5), _rules()).iloc[0] == 1
 
 
 def test_candidates_on_real_feature_frame_are_rare_and_two_sided():
-    f = compute_features(make_bars15(WARMUP_BARS + 30 * 96, seed=7))
+    f = compute_features(make_bars1h(WARMUP_BARS + 30 * 24, seed=7))
     c = candidates(f, _rules())
     assert set(c.unique()) <= {-1, 0, 1}
     assert 0 < (c != 0).mean() < 0.2
@@ -186,3 +186,12 @@ def test_strategy_md_jev_section_is_optional_and_validated(tmp_path):
     )
     with pytest.raises(ParamError, match="p_cutoff"):
         load_strategy_md(p)
+
+
+def test_grid_time_stops_are_in_hours_for_1h_bars():
+    assert {p.time_stop_bars for p in grid()} == {12, 24}
+
+
+def test_grid_rsi_levels_are_the_measured_pullback_quartiles():
+    """Chosen from the RSI distribution during 1h trend pullbacks (2021-2025, no returns used)."""
+    assert sorted({p.rsi_long_max for p in grid()}) == [51.0, 56.0, 61.0]

@@ -13,7 +13,7 @@ def test_invalidate_after_gaps_drops_rows_whose_lookback_crosses_a_gap():
     t = np.arange(100, dtype=np.int64) * BAR
     feats = pd.DataFrame({"t": t, "x": 1.0})
     gaps = [(20 * BAR, 30 * BAR)]  # bars 20..29 missing; bar 30 opens at 30*BAR, closes (t) at 31*BAR
-    out = invalidate_after_gaps(feats, gaps, warmup_bars=10)
+    out = invalidate_after_gaps(feats, gaps, warmup_bars=10, bar_ms=BAR)
     # rows with t in [gap_end, gap_end + warmup) are gone
     assert not ((out.t >= 30 * BAR) & (out.t < 40 * BAR)).any()
     assert (out.t == 40 * BAR).any() and (out.t == 19 * BAR).any()

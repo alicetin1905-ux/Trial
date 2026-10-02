@@ -89,3 +89,29 @@ def test_find_gaps_reports_missing_ranges():
     b = _bars15(10).drop(index=[3, 4]).reset_index(drop=True)
     gaps = find_gaps(b, BAR_MS)
     assert gaps == [(T0 + 3 * BAR_MS, T0 + 5 * BAR_MS)]
+
+
+def test_resample_from_1h_base_to_4h_and_1d():
+    H = 3600 * 1000
+    n = 48
+    ot = T0 + np.arange(n, dtype=np.int64) * H
+    b = pd.DataFrame(
+        {
+            "open_time": ot,
+            "open": 1.0 + np.arange(n),
+            "high": 2.0 + np.arange(n),
+            "low": 0.0 + np.arange(n),
+            "close": 1.5 + np.arange(n),
+            "volume": 1.0,
+            "buy_volume": 0.5,
+            "sell_volume": 0.5,
+            "quote_volume": 1.0,
+            "trade_count": 1,
+            "vwap": 1.0,
+            "available_at": ot + H,
+        }
+    )
+    h4 = resample(b, 240, base_minutes=60)
+    assert len(h4) == 12 and h4.iloc[0].close == 4.5 and h4.iloc[0].volume == 4.0
+    d = resample(b, 1440, base_minutes=60)
+    assert len(d) == 2 and d.iloc[1].available_at == T0 + 48 * H

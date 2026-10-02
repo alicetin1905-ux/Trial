@@ -29,12 +29,13 @@ from jevbot.backtest.metrics import (
 )
 from jevbot.backtest.trials import TrialLog
 from jevbot.backtest.walkforward import DESIGN_END, DESIGN_START, folds, select_and_stitch
+from jevbot.data.bars import find_gaps, resample
 from jevbot.data.history import load_bars15
 from jevbot.state.features import atr
+from jevbot.state.snapshot import BAR_MS as SNAP_BAR_MS
 from jevbot.state.snapshot import WARMUP_BARS, compute_features
 from jevbot.strategy.params import RuleParams, grid, params_hash
 
-BAR_MS = 15 * 60 * 1000
 EQUITY0 = 10_000.0
 
 
@@ -45,12 +46,14 @@ class ConfigRun:
     trades: pd.DataFrame  # needs entry_day, ret
 
 
-def invalidate_after_gaps(feats: pd.DataFrame, gaps: list[tuple[int, int]], warmup_bars: int) -> pd.DataFrame:
+def invalidate_after_gaps(
+    feats: pd.DataFrame, gaps: list[tuple[int, int]], warmup_bars: int, bar_ms: int
+) -> pd.DataFrame:
     """Drop feature rows whose lookback window crosses a data gap."""
     bad = np.zeros(len(feats), dtype=bool)
     t = feats["t"].to_numpy(np.int64)
     for _, gap_end in gaps:
-        bad |= (t >= gap_end) & (t < gap_end + warmup_bars * BAR_MS)
+        bad |= (t >= gap_end) & (t < gap_end + warmup_bars * bar_ms)
     return feats[~bad].reset_index(drop=True)
 
 
@@ -118,13 +121,15 @@ def oos_evaluate(runs: dict[str, ConfigRun], log: TrialLog, label: str) -> dict:
 def load_design(
     data_dir: Path, symbol: str = "BTCUSDT", start: str = "2020-09-01"
 ) -> tuple[pd.DataFrame, list]:
-    """Warm-up + design period only. Never reads past DESIGN_END."""
-    return load_bars15(data_dir, symbol, start, DESIGN_END)
+    """1h bars (built from the 15m history) for warm-up + design period. Never reads past DESIGN_END."""
+    bars15, _ = load_bars15(data_dir, symbol, start, DESIGN_END)
+    bars = resample(bars15, 60)
+    return bars, find_gaps(bars, SNAP_BAR_MS)
 
 
 def prepare(bars: pd.DataFrame, gaps: list) -> tuple[pd.DataFrame, np.ndarray]:
     feats = compute_features(bars)
-    feats = invalidate_after_gaps(feats, gaps, WARMUP_BARS)
+    feats = invalidate_after_gaps(feats, gaps, WARMUP_BARS, SNAP_BAR_MS)
     design_start_ms = int(pd.Timestamp(DESIGN_START, tz="UTC").timestamp() * 1000)
     feats = feats[feats["t"] >= design_start_ms].reset_index(drop=True)
     return feats, atr(bars, 14).to_numpy()

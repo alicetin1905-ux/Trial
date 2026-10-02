@@ -101,12 +101,13 @@ def run(
     risk_pct: float = 1.0,
     max_notional_x: float = 2.0,
     entry_filter: EntryFilter | None = None,
+    bar_ms: int = BAR_MS,
 ) -> Result:
     ot = bars["open_time"].to_numpy(np.int64)
     o, h, lo, c = (bars[k].to_numpy(float) for k in ("open", "high", "low", "close"))
     n = len(bars)
     contiguous_next = np.zeros(n, dtype=bool)
-    contiguous_next[:-1] = np.diff(ot) == BAR_MS
+    contiguous_next[:-1] = np.diff(ot) == bar_ms
 
     equity = equity0
     bar_equity = np.empty(n)
@@ -172,7 +173,7 @@ def run(
         if pos is not None:
             s, sl, tp = pos["side"], pos["sl_px"], pos["tp_px"]
             slip = costs.slip(pos["atr"], o[i])
-            bar_close_t = int(ot[i]) + BAR_MS
+            bar_close_t = int(ot[i]) + bar_ms
             if (s == 1 and o[i] <= sl) or (s == -1 and o[i] >= sl):
                 close_pos(o[i] * (1 - s * slip), int(ot[i]), "sl")
             elif (s == 1 and lo[i] <= sl) or (s == -1 and h[i] >= sl):
@@ -184,7 +185,7 @@ def run(
             pos["held"] += 1
             if not contiguous_next[i]:
                 slip = costs.slip(pos["atr"], c[i])
-                close_pos(c[i] * (1 - pos["side"] * slip), int(ot[i]) + BAR_MS, "data_gap")
+                close_pos(c[i] * (1 - pos["side"] * slip), int(ot[i]) + bar_ms, "data_gap")
             elif pos["held"] >= rules.time_stop_bars:
                 pending_exit = "time"
             elif slope_sign_1h[i] == -pos["side"]:
@@ -197,13 +198,13 @@ def run(
         peak = max(peak, bar_equity[i])
 
         if pos is None and pending_entry is None and signal[i] != 0 and contiguous_next[i] and atr[i] > 0:
-            st = EngineState(equity, peak, day_start, int(ot[i]) + BAR_MS, float(c[i]))
+            st = EngineState(equity, peak, day_start, int(ot[i]) + bar_ms, float(c[i]))
             rp = risk_pct if entry_filter is None else entry_filter(i, int(signal[i]), st)
             if rp > 0:
                 pending_entry = (int(signal[i]), i, rp)
 
     if pos is not None:  # still open at the end of the data: close at the last close
-        close_pos(c[-1] * (1 - pos["side"] * costs.slip(pos["atr"], c[-1])), int(ot[-1]) + BAR_MS, "end")
+        close_pos(c[-1] * (1 - pos["side"] * costs.slip(pos["atr"], c[-1])), int(ot[-1]) + bar_ms, "end")
         bar_equity[-1] = equity
 
     tr = pd.DataFrame(trades, columns=TRADE_COLUMNS) if trades else pd.DataFrame(columns=TRADE_COLUMNS)
@@ -229,6 +230,7 @@ def run_rules(
 
     Bars with no valid features (warm-up, or a lookback that crosses a data gap) get no signal.
     """
+    from jevbot.state.snapshot import BAR_MS as SNAPSHOT_BAR_MS
     from jevbot.strategy.rules import candidates
 
     t = bars15["available_at"].to_numpy(np.int64)
@@ -237,5 +239,5 @@ def run_rules(
     valid = aligned.notna().all(axis=1).to_numpy()
     sig = np.zeros(len(t), dtype=int)
     sig[valid] = candidates(aligned[valid].reset_index(), rules).to_numpy()
-    slope = np.sign(aligned["ema50_slope_1h_atr"].fillna(0.0).to_numpy())
-    return run(bars15, sig, atr15, slope, rules, costs, **kw)
+    slope = np.sign(aligned["ema50_slope_4h_atr"].fillna(0.0).to_numpy())
+    return run(bars15, sig, atr15, slope, rules, costs, bar_ms=SNAPSHOT_BAR_MS, **kw)

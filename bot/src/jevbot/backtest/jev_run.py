@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from jevbot.backtest.engine import BAR_MS, CostModel, EngineState, run
+from jevbot.backtest.engine import CostModel, EngineState, run
 from jevbot.backtest.harness import EQUITY0, ConfigRun, to_config_run
 from jevbot.backtest.metrics import sharpe_daily
 from jevbot.backtest.walkforward import folds
@@ -26,7 +26,7 @@ from jevbot.config import RiskLimits
 from jevbot.decide import decide
 from jevbot.jev.client import JevFailure, JevResult
 from jevbot.risk.guard import Account, Market, Order, check
-from jevbot.state.snapshot import FEATURES
+from jevbot.state.snapshot import BAR_MS, FEATURES
 from jevbot.strategy.calibration import Calibrator, fit_calibrator
 from jevbot.strategy.combine import JevParams, aligned_factors
 from jevbot.strategy.params import RuleParams, Strategy, params_hash
@@ -228,10 +228,12 @@ def walk_forward_jev(
 ) -> list[FoldPick]:
     valid, aligned = aligned_inputs(bars, feats)
     t_of_bar = bars["available_at"].to_numpy(np.int64)
-    slope = np.sign(aligned["ema50_slope_1h_atr"].fillna(0.0).to_numpy())
+    slope = np.sign(aligned["ema50_slope_4h_atr"].fillna(0.0).to_numpy())
     sigs = {params_hash(p): signals_for(aligned, valid, p) for p in configs}
     rules_runs = {
-        params_hash(p): run(bars, sigs[params_hash(p)], atr15, slope, p, costs, equity0=EQUITY0)
+        params_hash(p): run(
+            bars, sigs[params_hash(p)], atr15, slope, p, costs, equity0=EQUITY0, bar_ms=BAR_MS
+        )
         for p in configs
     }
     samples = {k: trade_samples(r.trades, t_of_bar, answers) for k, r in rules_runs.items()}
@@ -246,8 +248,10 @@ def walk_forward_jev(
         strat = Strategy(rules=p, jev=jp, body="", sha256=params_hash(p))
         flog = FilterLog(vetoes={})
         filt = make_filter(b, answers, strat, cal, limits, atr15[lo:hi], flog)
-        res = run(b, sigs[params_hash(p)][lo:hi], atr15[lo:hi], slope[lo:hi], p, costs, equity0=EQUITY0,
-                  entry_filter=filt)  # fmt: skip
+        res = run(
+            b, sigs[params_hash(p)][lo:hi], atr15[lo:hi], slope[lo:hi], p, costs,
+            equity0=EQUITY0, bar_ms=BAR_MS, entry_filter=filt,
+        )  # fmt: skip
         return to_config_run(res), flog
 
     picks: list[FoldPick] = []

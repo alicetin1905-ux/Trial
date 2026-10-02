@@ -12,16 +12,17 @@ import pandas as pd
 BASE_MS = 15 * 60 * 1000
 
 
-def resample(bars15: pd.DataFrame, minutes: int) -> pd.DataFrame:
-    """Aggregate 15m bars into `minutes` bars aligned to UTC multiples.
+def resample(bars15: pd.DataFrame, minutes: int, base_minutes: int = 15) -> pd.DataFrame:
+    """Aggregate `base_minutes` bars into `minutes` bars aligned to UTC multiples.
 
-    Only complete groups are emitted: a group missing any 15m bar (a gap, or the still-forming
+    Only complete groups are emitted: a group missing any base bar (a gap, or the still-forming
     trailing period) is dropped, so a partial higher-timeframe bar can never leak into a decision.
     """
     span = minutes * 60 * 1000
-    if span % BASE_MS:
-        raise ValueError(f"{minutes}m is not a multiple of 15m")
-    need = span // BASE_MS
+    base = base_minutes * 60 * 1000
+    if span % base:
+        raise ValueError(f"{minutes}m is not a multiple of {base_minutes}m")
+    need = span // base
     b = bars15.sort_values("open_time")
     key = (b["open_time"] // span) * span
     g = b.groupby(key, sort=True)

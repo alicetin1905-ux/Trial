@@ -163,3 +163,16 @@ def test_entry_filter_sees_equity_peak_and_day_start():
     assert seen[1].equity == pytest.approx(9_900.0)
     assert seen[1].peak_equity == 10_000.0 and seen[1].day_start_equity == 10_000.0
     assert seen[1].now_ms == b.available_at[4] and seen[1].close == 100.0
+
+
+def test_engine_runs_on_1h_bars():
+    H1 = 3600 * 1000
+    b = _bars([FLAT] * 8)
+    b["open_time"] = T1 + np.arange(8, dtype=np.int64) * H1
+    b["available_at"] = b["open_time"] + H1
+    n = len(b)
+    sig = np.zeros(n, dtype=int)
+    sig[0] = 1
+    r = run(b, sig, np.full(n, 1.0), np.ones(n), RULES, NO_COST, equity0=10_000.0, bar_ms=H1)
+    t = r.trades.iloc[0]
+    assert t.reason == "time" and t.entry_time == T1 + H1 and t.exit_time == T1 + 5 * H1

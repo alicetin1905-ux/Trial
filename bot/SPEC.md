@@ -11,7 +11,7 @@ Harness: the same six phases AgenKit uses (brainstorm, architecture, plan, test-
 | Asset | BTCUSDT linear perpetual |
 | Strategy idea | Trend + pullback, with Jev filtering regime and setup quality |
 | Deploy target | Mac Mini, launchd `KeepAlive`, sleep disabled |
-| Timeframe | 15m entries, 1h/4h trend filter |
+| Timeframe | **1h entries, 4h/1d trend filter** (changed from 15m on 2026-10-02: at 15m, costs were ~4× the gross edge; see `reports/baseline_rules_only_v2.md`) |
 | Manual approval threshold | $25,000 notional (was $2,500) |
 | Jev access | Your own TypeSafe key, read from `TYPESAFE_API_KEY`, with the model version pinned |
 
@@ -26,7 +26,7 @@ Non-goals for v1: more than one asset, more than one open position, leverage abo
 | Layer | Runs | Can do | Can never do |
 |---|---|---|---|
 | **Opus 5.5** (slow brain) | Weekly (Sun), offline | Read logs, propose edits to `strategy.md` and `questions.yaml`, write code in a branch, review | Grade its own output, touch `risk.yaml`, place orders, change anything that is live |
-| **Jev** (fast reflex) | Each closed 15m candle | Return calibrated probabilities for fixed typed questions about one snapshot | Return text, see anything except the snapshot, decide size, veto or order |
+| **Jev** (fast reflex) | Each closed 1h candle | Return calibrated probabilities for fixed typed questions about one snapshot | Return text, see anything except the snapshot, decide size, veto or order |
 | **Deterministic code** | Always | Own market state, thresholds, sizing, risk vetoes, orders, kill switch | Be changed at runtime by any model output |
 
 How this is enforced: the weekly loop can only write to `staging/`. A test fails the build if a candidate diff touches `risk.yaml`, `risk/` or `execution/`. Jev's answers reach the decision function as floats and nothing else.
@@ -39,11 +39,11 @@ Inputs are limited to data that can be **rebuilt historically with exact timesta
 
 | Feature | Source | History available |
 |---|---|---|
-| Returns over 15m, 1h, 4h, 24h (in units of current volatility) | klines | yes |
-| Realised volatility, 4h and 3d, plus their ratio | klines | yes |
-| Trend: EMA slope on 1h and 4h, distance from EMA in ATRs, ADX | klines | yes |
-| Pullback depth (from swing high/low, in ATRs), RSI(14) on 15m | klines | yes |
-| Order flow: signed taker volume imbalance over 15m and 1h, trade-count z-score | Bybit public trade archive (`public.bybit.com/trading`) | yes, daily files |
+| Returns over 1h, 4h, 24h, 72h (in units of current volatility) | klines | yes |
+| Realised volatility, 24h and 7d, plus their ratio | klines | yes |
+| Trend: 4h EMA(50) and daily SMA(50) slope and distance in ATRs, 4h ADX | klines | yes |
+| Pullback depth from the 24h high/low in 1h ATRs, RSI(14) on 1h | klines | yes |
+| Order flow: signed taker volume imbalance over 1h and 4h, trade-count z-score | Bybit public trade archive (`public.bybit.com/trading`) | yes, daily files |
 | Hours to next funding | clock | yes |
 | Funding rate | funding history API | **deferred**: the API is geo-blocked from the cloud build, so there is no history yet. It's added on the Mac Mini as a gated strategy change |
 | Spread, top-10 book imbalance | live websocket only | **no** |
@@ -56,10 +56,10 @@ Leakage rule: every input has `available_at <= decision_time`. The candle that j
 
 ## 4. Strategy hypothesis: trend + pullback (to be backtested, not assumed)
 
-- **Trend filter:** 1h EMA(50) slope sign and 4h close relative to EMA(50) agree.
-- **Pullback entry (15m):** in an uptrend, price pulls back between 1 and 2.5 **ATR(1h)** from the 6h swing high (changed 2026-10-02: the first version used ATR(15m), which made the conditions almost never coincide; see `reports/baseline_rules_only.md`) and RSI(14) drops below a threshold. The mirror rule applies for shorts. A deterministic **candidate** flag is set only when this holds.
+- **Trend filter:** 4h EMA(50) slope sign and daily close relative to the 50-day SMA agree (SMA, not EMA, so a live window matches the full history exactly).
+- **Pullback entry (1h, since 2026-10-02):** in an uptrend, price pulls back between 1 and 2.5 ATR(1h) from the 24h high and 1h RSI is below a "momentum has cooled" level (grid 51/56/61: the measured quartiles of RSI during such pullbacks; oversold levels almost never occur there). The mirror rule applies for shorts. History of this rule: the 15m version measured the pullback in ATR(15m), then in ATR(1h) from the 6h swing high (changed 2026-10-02: the first version used ATR(15m), which made the conditions almost never coincide; see `reports/baseline_rules_only.md`) and RSI(14) drops below a threshold. The mirror rule applies for shorts. A deterministic **candidate** flag is set only when this holds.
 - **Jev filter:** on candidate candles, the questions in §5 have to clear the thresholds in `strategy.md`.
-- **Exit:** stop at entry minus k×ATR, take profit at R×stop distance, time stop after N hours, and an invalidation exit if the 1h trend flips.
+- **Exit:** stop at entry minus k×ATR, take profit at R×stop distance, time stop after N hours, and an invalidation exit if the 4h trend flips. Time stop grid: 12 or 24 hours.
 - **Parameter grid is fixed in advance and kept small:** about 3×3×3×2 = 54 combinations. Every combination tried is counted as a trial (§9).
 
 Honest prior: trend strategies usually win 35–45% of trades. Entering on pullbacks pushes the win rate up, but **the hit rate above 55% and Sharpe above 1.5 gates together are a high bar. This hypothesis may well fail.** If it does, the harness says so, and nothing goes to paper trading.
@@ -74,7 +74,7 @@ setup_quality: score [0..4]             # rubric: clean pullback in trend ... br
 risk_state:  choice  {normal, elevated, extreme}
 ```
 
-Live: Jev is called on **every** closed 15m candle (96 calls a day, about $0.002 a day), for the dashboard and calibration data. Decisions only use candidate candles. Backtest: Jev is called on every candidate candle plus a 10% random sample of the others, for calibration. The responses are cached by snapshot hash, so reruns are free and give the same result every time. Calling on all of 2021–2026 would be about 200k candles, about $4 and about 3 hours at 1,200 requests/min. Calling only on candidates is a fraction of that.
+Live: Jev is called on **every** closed 1h candle (24 calls a day, well under $0.001 a day), for the dashboard and calibration data. Decisions only use candidate candles. Backtest: Jev is called on every candidate candle plus a 10% random sample of the others, for calibration. The responses are cached by snapshot hash, so reruns are free and give the same result every time. Calling on all of 2021–2026 would be about 50k candles, about $1 and under an hour at 1,200 requests/min. Calling only on candidates is a fraction of that.
 
 No answer within 1.5 s, an error, or a malformed answer all mean **no trade**. It is never retried into a late entry.
 
@@ -179,4 +179,4 @@ Already on that list: exchange outage while in a position, a gap through the sto
 2. Risk defaults in §8: **accepted as written.**
 3. Promotion: **your `/promote` tap, max one per week.**
 4. Keys: **your own TypeSafe key** in `.env` as `TYPESAFE_API_KEY`. It never goes in chat, code or logs.
-5. Timeframe: **15m entries, 1h/4h trend.** Note: cost drag per trade is about 4× higher than on 1h, so the cost-stress test (2× costs) matters more.
+5. Timeframe: ~~15m entries, 1h/4h trend~~ → **1h entries, 4h/1d trend** (changed 2026-10-02 after baseline v2). Note: cost drag per trade is about 4× higher than on 1h, so the cost-stress test (2× costs) matters more.

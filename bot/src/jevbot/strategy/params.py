@@ -29,10 +29,10 @@ class RuleParams(BaseModel):
 
     pullback_min_atr: float = Field(gt=0)
     pullback_max_atr: float = Field(gt=0)
-    rsi_long_max: float = Field(gt=0, lt=50)  # shorts use 100 - rsi_long_max
+    rsi_long_max: float = Field(gt=0, lt=100)  # shorts use 100 - rsi_long_max
     stop_atr_k: float = Field(gt=0, le=5)
     take_profit_r: float = Field(gt=0, le=10)
-    time_stop_bars: int = Field(gt=0, le=4 * 96)
+    time_stop_bars: int = Field(gt=0, le=7 * 24)
     direction: Literal["both", "long", "short"]
 
     @model_validator(mode="after")
@@ -79,10 +79,12 @@ def load_strategy_md(path: Path) -> Strategy:
 
 # The search space is fixed BEFORE any backtest (spec §4) and every config tried counts as a trial.
 GRID = {
-    "rsi_long_max": (35.0, 40.0, 45.0),
+    # Quartiles of 1h RSI during 1h trend pullbacks of 1-2.5 ATR (2021-2025), measured BEFORE any
+    # 1h backtest and without returns. Oversold levels (35-45) almost never occur in such pullbacks.
+    "rsi_long_max": (51.0, 56.0, 61.0),
     "stop_atr_k": (1.0, 1.5, 2.0),
     "take_profit_r": (1.0, 1.5, 2.0),
-    "time_stop_bars": (16, 32),
+    "time_stop_bars": (12, 24),  # hours, on 1h bars
 }
 GRID_FIXED = {"pullback_min_atr": 1.0, "pullback_max_atr": 2.5, "direction": "both"}
 

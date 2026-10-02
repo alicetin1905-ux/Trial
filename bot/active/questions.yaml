@@ -5,18 +5,17 @@
 # The feature names are listed in the legend below; the values come from state/snapshot.py.
 
 legend:
-  ret_15m_z / ret_1h_z / ret_4h_z / ret_24h_z: "log return over the window divided by recent volatility scaled to that window (a z-score)"
-  rv_4h_ann_pct / rv_3d_ann_pct: "realised volatility, annualised %, over 4 hours / 3 days"
-  rv_ratio_4h_3d: "short-term vol / longer-term vol; above 1 means volatility is expanding"
-  ema50_slope_1h_atr / ema50_slope_4h_atr: "change in the 50-period EMA over 3 bars, in units of ATR, on 1h / 4h bars"
-  dist_ema50_1h_atr / dist_ema50_4h_atr: "close minus 50-period EMA, in units of ATR, on 1h / 4h bars"
-  adx14_1h: "ADX(14) on 1h bars; above 25 means a strong trend"
-  pullback_6h_atr: "distance below the 6-hour high, in 15m ATRs"
-  bounce_6h_atr: "distance above the 6-hour low, in 15m ATRs"
-  pullback_6h_atr1h / bounce_6h_atr1h: "the same two distances measured in 1h ATRs; a healthy pullback in a trend is about 1 to 2.5"
-  rsi14_15m: "RSI(14) on 15m bars"
-  flow_imb_15m / flow_imb_1h: "(taker buy volume - taker sell volume) / total, over 15m / 1h; -1..1"
-  trade_count_z_15m: "number of trades in the last 15m vs the last 3 days, as a z-score"
+  ret_1h_z / ret_4h_z / ret_24h_z / ret_72h_z: "log return over the window divided by recent volatility scaled to that window (a z-score)"
+  rv_24h_ann_pct / rv_7d_ann_pct: "realised volatility, annualised %, over 24 hours / 7 days"
+  rv_ratio_24h_7d: "short-term vol / longer-term vol; above 1 means volatility is expanding"
+  ema50_slope_4h_atr / dist_ema50_4h_atr: "4h bars: change in the 50-period EMA over 3 bars, and close minus that EMA, in 4h ATRs"
+  sma50_slope_1d_atr / dist_sma50_1d_atr: "daily bars: change in the 50-day SMA over 3 days, and close minus that SMA, in daily ATRs"
+  adx14_4h: "ADX(14) on 4h bars; above 25 means a strong trend"
+  pullback_24h_atr: "distance below the 24-hour high, in 1h ATRs; a healthy pullback in a trend is about 1 to 2.5"
+  bounce_24h_atr: "distance above the 24-hour low, in 1h ATRs"
+  rsi14_1h: "RSI(14) on 1h bars"
+  flow_imb_1h / flow_imb_4h: "(taker buy volume - taker sell volume) / total, over 1h / 4h; -1..1"
+  trade_count_z_1h: "number of trades in the last hour vs the last 7 days, as a z-score"
   hours_to_funding: "hours until the next perpetual funding settlement"
 
 questions:
@@ -39,7 +38,7 @@ questions:
 
   buy_pressure_real:
     type: noul
-    instructions: "Is the taker buying pressure persistent across the 15m and 1h windows and backed by above-normal activity, rather than one isolated burst?"
+    instructions: "Is the taker buying pressure persistent across the 1h and 4h windows and backed by above-normal activity, rather than one isolated burst?"
     criteria:
       true: "Buying dominates on both windows and activity is not unusually low"
       false: "Selling dominates, the windows disagree, or the imbalance is a one-off on thin activity"
