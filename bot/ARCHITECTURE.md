@@ -20,7 +20,7 @@ every closed 15m candle            ▼
                                                                           ▼
                                       risk.guard(Intent, account, limits) ── veto ──▶ journal + alert
                                                        │ pass
-                                       notional > $2,500? ── yes ──▶ Telegram approve/deny (5 min)
+                                       notional > $25,000? ─ yes ──▶ Telegram approve/deny (5 min)
                                                        │
                                      broker: demo-account orders + shadow fills vs mainnet book
                                                        │

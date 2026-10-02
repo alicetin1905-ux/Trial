@@ -40,7 +40,7 @@ def test_shipped_risk_yaml_matches_approved_spec():
     assert limits.max_drawdown_pct == 10.0
     assert limits.max_leverage == 2
     assert limits.max_open_positions == 1
-    assert limits.manual_approval_notional_usd == 2500
+    assert limits.manual_approval_notional_usd == 25_000
     assert limits.approval_timeout_s == 300
     assert limits.kelly_fraction == 0.25
 

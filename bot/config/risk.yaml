@@ -9,7 +9,7 @@ max_leverage: 2                      # isolated margin
 max_open_positions: 1
 daily_loss_limit_pct: 3.0            # vs start-of-day equity (00:00 UTC) -> flat, no entries until next day
 max_drawdown_pct: 10.0               # vs peak equity -> KILL SWITCH
-manual_approval_notional_usd: 2500   # above this, ask in Telegram first
+manual_approval_notional_usd: 25000  # above this, ask in Telegram first (user decision 2026-10-02)
 approval_timeout_s: 300              # unanswered approval = deny
 stale_data_multiple: 2.0             # no entries if the last bar/heartbeat is older than N x expected
 max_spread_bps: 3.0                  # no entry above this spread

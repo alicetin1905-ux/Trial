@@ -12,7 +12,7 @@ Harness: the same six phases AgenKit uses (brainstorm, architecture, plan, test-
 | Strategy idea | Trend + pullback, with Jev filtering regime and setup quality |
 | Deploy target | Mac Mini, launchd `KeepAlive`, sleep disabled |
 | Timeframe | 15m entries, 1h/4h trend filter |
-| Manual approval threshold | $2,500 notional |
+| Manual approval threshold | $25,000 notional (was $2,500) |
 | Jev access | Your own TypeSafe key, read from `TYPESAFE_API_KEY`, with the model version pinned |
 
 ## 1. Goal and non-goals
@@ -57,7 +57,7 @@ Leakage rule: every input has `available_at <= decision_time`. The candle that j
 ## 4. Strategy hypothesis: trend + pullback (to be backtested, not assumed)
 
 - **Trend filter:** 1h EMA(50) slope sign and 4h close relative to EMA(50) agree.
-- **Pullback entry (15m):** in an uptrend, price pulls back between 1 and 2.5 ATR(15m) from the 6h swing high and RSI(14) drops below a threshold. The mirror rule applies for shorts. A deterministic **candidate** flag is set only when this holds.
+- **Pullback entry (15m):** in an uptrend, price pulls back between 1 and 2.5 **ATR(1h)** from the 6h swing high (changed 2026-10-02: the first version used ATR(15m), which made the conditions almost never coincide; see `reports/baseline_rules_only.md`) and RSI(14) drops below a threshold. The mirror rule applies for shorts. A deterministic **candidate** flag is set only when this holds.
 - **Jev filter:** on candidate candles, the questions in §5 have to clear the thresholds in `strategy.md`.
 - **Exit:** stop at entry minus k×ATR, take profit at R×stop distance, time stop after N hours, and an invalidation exit if the 1h trend flips.
 - **Parameter grid is fixed in advance and kept small:** about 3×3×3×2 = 54 combinations. Every combination tried is counted as a trial (§9).
@@ -104,7 +104,7 @@ Calibration is measured per question (Brier score and reliability curve, 10 bins
 | Max open positions | 1 |
 | Daily loss limit | 3% of start-of-day equity → flat, then no new entries until 00:00 UTC |
 | Max drawdown | 10% from peak equity → **kill switch** |
-| Manual approval | Order notional above **$2,500** → Telegram approve/deny, auto-deny after 5 min |
+| Manual approval | Order notional above **$25,000** → Telegram approve/deny, auto-deny after 5 min (raised from $2,500 on 2026-10-02: at $2,500 almost every trade would have needed a tap) |
 | Stale data | Last candle or websocket heartbeat older than 2× expected → no entries |
 | Spread veto | Spread above 3 bps → no entry |
 | Funding veto | No entry within 10 min of funding settlement |
@@ -175,7 +175,7 @@ Already on that list: exchange outage while in a position, a gap through the sto
 
 ## 18. Answers (all resolved)
 
-1. Manual approval threshold: **$2,500 notional**, auto-deny after 5 min.
+1. Manual approval threshold: ~~$2,500~~ **$25,000 notional** (changed 2026-10-02), auto-deny after 5 min.
 2. Risk defaults in §8: **accepted as written.**
 3. Promotion: **your `/promote` tap, max one per week.**
 4. Keys: **your own TypeSafe key** in `.env` as `TYPESAFE_API_KEY`. It never goes in chat, code or logs.

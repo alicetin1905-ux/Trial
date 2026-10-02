@@ -15,7 +15,7 @@ SNAP = {
     "ret_15m_z": 0.1,
     "ema50_slope_1h_atr": 0.4,
     "dist_ema50_4h_atr": 1.2,
-    "pullback_6h_atr": 1.6,
+    "pullback_6h_atr1h": 1.6,
     "rsi14_15m": 31.0,
     "flow_imb_15m": 0.2,
     "flow_imb_1h": 0.1,

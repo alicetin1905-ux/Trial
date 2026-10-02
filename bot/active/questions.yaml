@@ -13,6 +13,7 @@ legend:
   adx14_1h: "ADX(14) on 1h bars; above 25 means a strong trend"
   pullback_6h_atr: "distance below the 6-hour high, in 15m ATRs"
   bounce_6h_atr: "distance above the 6-hour low, in 15m ATRs"
+  pullback_6h_atr1h / bounce_6h_atr1h: "the same two distances measured in 1h ATRs; a healthy pullback in a trend is about 1 to 2.5"
   rsi14_15m: "RSI(14) on 15m bars"
   flow_imb_15m / flow_imb_1h: "(taker buy volume - taker sell volume) / total, over 15m / 1h; -1..1"
   trade_count_z_15m: "number of trades in the last 15m vs the last 3 days, as a z-score"

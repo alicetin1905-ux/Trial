@@ -135,3 +135,20 @@ def test_live_window_matches_full_history(bars120d):
 def test_snapshot_at_rejects_a_time_without_a_closed_bar(bars120d):
     with pytest.raises(KeyError):
         snapshot_at(bars120d, T0 + 7 * BAR_MS + 1)
+
+
+def test_pullback_in_1h_atr_units():
+    """pullback_6h_atr1h = (6h high of 15m bars - close) / ATR(14) of 1h bars, as of t."""
+    from jevbot.data.bars import resample
+    from jevbot.state.features import atr as atr_fn
+
+    b = make_bars15(WARMUP_BARS + 200, seed=9)
+    f = compute_features(b).set_index("t")
+    t = int(b["available_at"].iloc[-1])
+    h = resample(b, 60)
+    h = h[h["available_at"] <= t]
+    a1h = atr_fn(h, 14).iloc[-1]
+    expected = (b["high"].iloc[-24:].max() - b["close"].iloc[-1]) / a1h
+    assert f.loc[t, "pullback_6h_atr1h"] == pytest.approx(round(expected, 4), abs=1e-4)
+    expected_b = (b["close"].iloc[-1] - b["low"].iloc[-24:].min()) / a1h
+    assert f.loc[t, "bounce_6h_atr1h"] == pytest.approx(round(expected_b, 4), abs=1e-4)

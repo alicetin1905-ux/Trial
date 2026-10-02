@@ -38,7 +38,7 @@ class FakeJev:
         mom = g("ret_4h_z", 0.0) + g("flow_imb_1h", 0.0)
         direction = _softmax({"up": mom, "down": -mom, "flat": 0.3})
         pressure = 1 / (1 + math.exp(-4 * (g("flow_imb_15m", 0.0) + g("flow_imb_1h", 0.0))))
-        q = max(0.0, min(4.0, 2.0 + side * trend - abs(g("pullback_6h_atr", 1.5) - 1.75)))
+        q = max(0.0, min(4.0, 2.0 + side * trend - abs(g("pullback_6h_atr1h", 1.5) - 1.75)))
         lo = int(q)
         probs = {str(i): 0.0 for i in range(5)}
         probs[str(lo)] = round(1 - (q - lo), 6)

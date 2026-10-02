@@ -43,6 +43,8 @@ FEATURES = (
     "adx14_1h",
     "pullback_6h_atr",
     "bounce_6h_atr",
+    "pullback_6h_atr1h",
+    "bounce_6h_atr1h",
     "rsi14_15m",
     "flow_imb_15m",
     "flow_imb_1h",
@@ -69,6 +71,7 @@ def _trend_features(bars15: pd.DataFrame, minutes: int, tag: str) -> pd.DataFram
     )
     if tag == "1h":
         out["adx14_1h"] = adx(h, 14)
+        out["_atr_1h"] = a  # temporary, price units: used for the 1h-ATR pullback, then dropped
     return out
 
 
@@ -92,8 +95,12 @@ def compute_features(bars15: pd.DataFrame) -> pd.DataFrame:
     f["rv_4h_ann_pct"] = rv4h
     f["rv_3d_ann_pct"] = sigma * np.sqrt(BARS_PER_YEAR) * 100
     f["rv_ratio_4h_3d"] = rv4h / f["rv_3d_ann_pct"]
-    f["pullback_6h_atr"] = (b["high"].rolling(SWING_WINDOW).max() - c) / a15
-    f["bounce_6h_atr"] = (c - b["low"].rolling(SWING_WINDOW).min()) / a15
+    swing_hi = b["high"].rolling(SWING_WINDOW).max()
+    swing_lo = b["low"].rolling(SWING_WINDOW).min()
+    f["pullback_6h_atr"] = (swing_hi - c) / a15
+    f["bounce_6h_atr"] = (c - swing_lo) / a15
+    f["_hi_minus_c"] = swing_hi - c  # temporary, price units: never sent to Jev
+    f["_c_minus_lo"] = c - swing_lo
     f["rsi14_15m"] = rsi(c, 14)
     f["flow_imb_15m"] = _imbalance(b["buy_volume"], b["sell_volume"])
     f["flow_imb_1h"] = _imbalance(b["buy_volume"].rolling(4).sum(), b["sell_volume"].rolling(4).sum())
@@ -106,6 +113,9 @@ def compute_features(bars15: pd.DataFrame) -> pd.DataFrame:
         tf = _trend_features(b, minutes, tag).rename(columns={"available_at": "t"}).astype({"t": np.int64})
         f = pd.merge_asof(f.sort_values("t"), tf.sort_values("t"), on="t", direction="backward")
 
+    # The rules measure the pullback in 1h ATRs (spec §4); the 15m-ATR versions stay for Jev.
+    f["pullback_6h_atr1h"] = f["_hi_minus_c"] / f["_atr_1h"]
+    f["bounce_6h_atr1h"] = f["_c_minus_lo"] / f["_atr_1h"]
     f = f[["t", *FEATURES]]
     f = f.iloc[WARMUP_BARS - 1 :]
     f = f.replace([np.inf, -np.inf], np.nan).dropna()

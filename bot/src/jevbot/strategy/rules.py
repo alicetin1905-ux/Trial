@@ -19,8 +19,9 @@ def candidates(f: pd.DataFrame, rules: RuleParams) -> pd.Series:
     """+1 long candidate, -1 short candidate, 0 none. Jev only scores candidates (spec §5)."""
     trend = trend_dir(f)
     lo, hi = rules.pullback_min_atr, rules.pullback_max_atr
-    long_ = (trend == 1) & f["pullback_6h_atr"].between(lo, hi) & (f["rsi14_15m"] < rules.rsi_long_max)
-    short = (trend == -1) & f["bounce_6h_atr"].between(lo, hi) & (f["rsi14_15m"] > 100 - rules.rsi_long_max)
+    # Pullback depth in 1h ATRs (spec §4); entries and stops stay on 15m.
+    long_ = (trend == 1) & f["pullback_6h_atr1h"].between(lo, hi) & (f["rsi14_15m"] < rules.rsi_long_max)
+    short = (trend == -1) & f["bounce_6h_atr1h"].between(lo, hi) & (f["rsi14_15m"] > 100 - rules.rsi_long_max)
     if rules.direction == "long":
         short = short & False
     elif rules.direction == "short":

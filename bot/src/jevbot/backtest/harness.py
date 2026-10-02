@@ -215,13 +215,15 @@ def stress_from_picks(
     }
 
 
-def baseline(data_dir: Path, reports_dir: Path, trials_path: Path) -> dict:
+def baseline(
+    data_dir: Path, reports_dir: Path, trials_path: Path, label: str = "baseline_rules_only"
+) -> dict:
     bars, gaps = load_design(data_dir)
     feats, atr15 = prepare(bars, gaps)
     configs = {params_hash(p): p for p in grid()}
     runs = run_grid(bars, feats, atr15, CostModel(), list(configs.values()))
     log = TrialLog(trials_path)
-    m = oos_evaluate(runs, log, label="baseline_rules_only")
+    m = oos_evaluate(runs, log, label=label)
     stress = stress_from_picks(bars, feats, atr15, m["picks"], configs, "baseline_stress_2x")
     notes = [
         f"Bars: {len(bars):,} 15m bars, {len(gaps)} data gap(s); "
@@ -231,11 +233,9 @@ def baseline(data_dir: Path, reports_dir: Path, trials_path: Path) -> dict:
         "makes results worse, never better.",
     ]
     ok = write_report(
-        reports_dir / "baseline_rules_only.md", "Baseline: rules only (no Jev)", m, stress, configs, notes
+        reports_dir / f"{label}.md", f"Baseline: rules only (no Jev), {label}", m, stress, configs, notes
     )
-    (reports_dir / "baseline_rules_only.json").write_text(
-        json.dumps(m | {"stress": stress, "pass": ok}, indent=2)
-    )
+    (reports_dir / f"{label}.json").write_text(json.dumps(m | {"stress": stress, "pass": ok}, indent=2))
     return m
 
 
@@ -245,8 +245,9 @@ def main() -> None:
     p.add_argument("--data-dir", default="data/bars15")
     p.add_argument("--reports-dir", default="reports")
     p.add_argument("--trials", default="reports/trials.jsonl")
+    p.add_argument("--label", default="baseline_rules_only")
     a = p.parse_args()
-    m = baseline(Path(a.data_dir), Path(a.reports_dir), Path(a.trials))
+    m = baseline(Path(a.data_dir), Path(a.reports_dir), Path(a.trials), a.label)
     print(json.dumps({k: v for k, v in m.items() if k not in ("fold_tests",)}, indent=2, default=str))
 
 

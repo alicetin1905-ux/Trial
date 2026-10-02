@@ -87,7 +87,7 @@ Tests first:
 - Restart → reconcile before trading.
 
 ### M10 Ops: Telegram, kill path, approvals, watchdog (about 1 day)
-`/status`, `/kill`, `/approve`, `/deny`, `/promote`, `/ackmodel`; chat-ID allowlist; manual approval above $2,500 with auto-deny after 5 min; heartbeat watchdog.
+`/status`, `/kill`, `/approve`, `/deny`, `/promote`, `/ackmodel`; chat-ID allowlist; manual approval above $25,000 with auto-deny after 5 min; heartbeat watchdog.
 Tests first: messages from other chat IDs are ignored, approval timeout → deny, a missing heartbeat → alert and then kill.
 
 ### M11 Dashboard and daily report (about 1 day)

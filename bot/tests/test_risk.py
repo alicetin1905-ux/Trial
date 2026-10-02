@@ -85,9 +85,20 @@ def test_spread_may_be_unmodelled_in_backtest_only():
 
 
 def test_large_order_needs_manual_approval_but_is_not_vetoed():
-    r = check(_order(units=26.0, stop_px=97.0), _acct(equity=100_000.0, peak_equity=100_000.0,
-              day_start_equity=100_000.0), _mkt(), LIMITS)  # fmt: skip
-    assert r.ok and r.requires_approval  # $2,600 notional > $2,500
+    big = 100_000.0
+    r = check(
+        _order(units=260.0, stop_px=99.0),
+        _acct(equity=big, peak_equity=big, day_start_equity=big),
+        _mkt(),
+        LIMITS,
+    )
+    assert r.ok and r.requires_approval  # $26,000 notional > $25,000
+
+
+def test_typical_paper_trade_does_not_need_approval():
+    # $10k account, 0.25% risk at a 0.4% stop = ~$6.25k notional: runs without a tap
+    r = check(_order(units=62.5, stop_px=99.6), _acct(), _mkt(), LIMITS)
+    assert r.ok and not r.requires_approval
 
 
 # --- property tests: the guard never passes an order that breaks a limit ----------------------

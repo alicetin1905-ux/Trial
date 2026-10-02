@@ -40,8 +40,8 @@ def _feat(**kw) -> pd.DataFrame:
         t=0,
         ema50_slope_1h_atr=0.3,
         dist_ema50_4h_atr=1.0,
-        pullback_6h_atr=1.5,
-        bounce_6h_atr=0.2,
+        pullback_6h_atr1h=1.5,
+        bounce_6h_atr1h=0.2,
         rsi14_15m=30.0,
     )
     return pd.DataFrame([row | kw])
@@ -101,8 +101,8 @@ def test_long_candidate_in_uptrend_pullback_with_low_rsi():
 @pytest.mark.parametrize(
     "kw",
     [
-        {"pullback_6h_atr": 0.5},  # too shallow
-        {"pullback_6h_atr": 3.0},  # too deep: structure broken
+        {"pullback_6h_atr1h": 0.5},  # too shallow
+        {"pullback_6h_atr1h": 3.0},  # too deep: structure broken
         {"rsi14_15m": 45.0},  # not oversold enough
         {"dist_ema50_4h_atr": -1.0},  # trends disagree
     ],
@@ -113,15 +113,19 @@ def test_no_long_candidate_when_a_condition_fails(kw):
 
 def test_short_candidate_mirrors_long():
     f = _feat(
-        ema50_slope_1h_atr=-0.3, dist_ema50_4h_atr=-1.0, bounce_6h_atr=1.5, pullback_6h_atr=0.1, rsi14_15m=70
+        ema50_slope_1h_atr=-0.3,
+        dist_ema50_4h_atr=-1.0,
+        bounce_6h_atr1h=1.5,
+        pullback_6h_atr1h=0.1,
+        rsi14_15m=70,
     )
     assert candidates(f, _rules()).iloc[0] == -1
     assert candidates(f, _rules(direction="long")).iloc[0] == 0
 
 
 def test_pullback_bounds_are_inclusive():
-    assert candidates(_feat(pullback_6h_atr=1.0), _rules()).iloc[0] == 1
-    assert candidates(_feat(pullback_6h_atr=2.5), _rules()).iloc[0] == 1
+    assert candidates(_feat(pullback_6h_atr1h=1.0), _rules()).iloc[0] == 1
+    assert candidates(_feat(pullback_6h_atr1h=2.5), _rules()).iloc[0] == 1
 
 
 def test_candidates_on_real_feature_frame_are_rare_and_two_sided():
