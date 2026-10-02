@@ -1,6 +1,6 @@
-# Plan (phase 3 of 6, awaiting approval)
+# Plan (phase 3 of 6, approved)
 
-Status: **DRAFT, needs your approval before any code is written.** It implements the approved `SPEC.md` and `ARCHITECTURE.md`.
+Status: **APPROVED 2026-10-02.** Build in progress: M0 done. It implements the approved `SPEC.md` and `ARCHITECTURE.md`.
 
 ## Ground rules for every task
 

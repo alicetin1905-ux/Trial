@@ -1,0 +1,30 @@
+# Runtime settings. NOT risk limits (those live in risk.yaml).
+# Only 'paper' is accepted. Live trading is unlocked by golive.py plus a manual edit (spec §17).
+mode: paper
+
+market:
+  symbol: BTCUSDT
+  category: linear
+  entry_timeframe_min: 15
+  trend_timeframes_min: [60, 240]
+
+jev:
+  model: jev-latest            # alias sent with each request
+  pinned_model: ""             # resolved name we trust. Empty = entries blocked until set via /ackmodel
+  live_timeout_s: 1.5
+  backtest_max_concurrency: 16
+
+opus:
+  model: claude-opus-5-5
+  effort: high
+  monthly_cap_usd: 5.0
+  per_run_cap_usd: 1.25
+  max_candidates_per_run: 3
+
+paths:
+  data_dir: data
+  db_path: data/jevbot.db
+  active_dir: active
+  staging_dir: staging
+  reports_dir: reports
+  halt_file: HALTED

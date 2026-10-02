@@ -1,0 +1,24 @@
+# HARD RISK LIMITS (spec §8). Edited by a human only.
+# The weekly Opus loop cannot write this file. Every decision journals this file's sha256.
+# The code also enforces absolute ceilings (jevbot.config.RISK_CEILINGS): a value above a ceiling
+# fails startup even if someone edits this file.
+
+max_risk_per_trade_pct: 1.0          # loss at the stop, as % of equity
+max_notional_x_equity: 2.0           # position notional / equity
+max_leverage: 2                      # isolated margin
+max_open_positions: 1
+daily_loss_limit_pct: 3.0            # vs start-of-day equity (00:00 UTC) -> flat, no entries until next day
+max_drawdown_pct: 10.0               # vs peak equity -> KILL SWITCH
+manual_approval_notional_usd: 2500   # above this, ask in Telegram first
+approval_timeout_s: 300              # unanswered approval = deny
+stale_data_multiple: 2.0             # no entries if the last bar/heartbeat is older than N x expected
+max_spread_bps: 3.0                  # no entry above this spread
+funding_blackout_min: 10             # no entry within N minutes of a funding settlement
+price_band_pct: 1.0                  # limit price must be within ±N% of mid
+max_order_attempts_per_min: 3
+kill_error_count: 3                  # this many order errors...
+kill_error_window_min: 10            # ...within this window -> KILL SWITCH
+kelly_fraction: 0.25                 # quarter Kelly
+fixed_risk_pct_until_calibrated: 0.25
+calibration_min_decisions: 100       # Kelly sizing only after this many resolved decisions...
+calibration_max_ece: 0.05            # ...and calibration error below this, on our own fills
