@@ -12,6 +12,7 @@ Harness: the same six phases AgenKit uses (brainstorm, architecture, plan, test-
 | Strategy idea | Trend + pullback, with Jev filtering regime and setup quality |
 | Deploy target | Mac Mini, launchd `KeepAlive`, sleep disabled |
 | Manual approval threshold | **Proposed $2,500 notional.** You need to confirm this (§18) |
+| Jev access | Your own TypeSafe key, read from `TYPESAFE_API_KEY`, with the model version pinned |
 
 ## 1. Goal and non-goals
 
@@ -170,5 +171,5 @@ Already on that list: exchange outage while in a position, a gap through the sto
 1. **Manual approval threshold:** is $2,500 notional OK?
 2. **Risk defaults in §8:** OK as written, especially the 10% live drawdown kill and the 2x leverage cap?
 3. **Promotion:** do nightly changes that pass the gates need your `/promote` tap and stay capped at one per week (my recommendation), or should they promote automatically?
-4. **Keys:** Jev has paused new signups (as of late September 2026). Do you already have a TypeSafe key, or should I go through Vercel AI Gateway (`typesafe-ai/jev`)? Don't paste keys into chat. I'll ship `.env.example`, and you fill in `.env` on the Mac Mini.
+4. ~~**Keys:** TypeSafe key or a gateway?~~ **Answered: you have a TypeSafe key.** It goes in `.env` as `TYPESAFE_API_KEY`, never in chat.
 5. **Timeframe:** is 1h entries with a 4h/1d trend filter OK, or do you want 15m?
