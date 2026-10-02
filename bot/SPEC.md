@@ -1,6 +1,6 @@
 # Spec: Opus + Jev trading bot (phase 1 of 6, awaiting approval)
 
-Status: **DRAFT, needs your approval before architecture starts.**
+Status: **APPROVED 2026-10-02.** All answers are recorded in §18. Next phase: architecture.
 Harness: the same six phases AgenKit uses (brainstorm, architecture, plan, test-first build, review, ship), run by hand without the paid AgenKit licence. Work stops for your approval after this spec, after the architecture and after the plan.
 
 ## 0. Decisions so far
@@ -11,7 +11,8 @@ Harness: the same six phases AgenKit uses (brainstorm, architecture, plan, test-
 | Asset | BTCUSDT linear perpetual |
 | Strategy idea | Trend + pullback, with Jev filtering regime and setup quality |
 | Deploy target | Mac Mini, launchd `KeepAlive`, sleep disabled |
-| Manual approval threshold | **Proposed $2,500 notional.** You need to confirm this (§18) |
+| Timeframe | 15m entries, 1h/4h trend filter |
+| Manual approval threshold | $2,500 notional |
 | Jev access | Your own TypeSafe key, read from `TYPESAFE_API_KEY`, with the model version pinned |
 
 ## 1. Goal and non-goals
@@ -25,7 +26,7 @@ Non-goals for v1: more than one asset, more than one open position, leverage abo
 | Layer | Runs | Can do | Can never do |
 |---|---|---|---|
 | **Opus 5.5** (slow brain) | Nightly, offline | Read logs, propose edits to `strategy.md` and `questions.yaml`, write code in a branch, review | Grade its own output, touch `risk.yaml`, place orders, change anything that is live |
-| **Jev** (fast reflex) | Each closed 1h candle | Return calibrated probabilities for fixed typed questions about one snapshot | Return text, see anything except the snapshot, decide size, veto or order |
+| **Jev** (fast reflex) | Each closed 15m candle | Return calibrated probabilities for fixed typed questions about one snapshot | Return text, see anything except the snapshot, decide size, veto or order |
 | **Deterministic code** | Always | Own market state, thresholds, sizing, risk vetoes, orders, kill switch | Be changed at runtime by any model output |
 
 How this is enforced: the nightly loop can only write to `staging/`. A test fails the build if a candidate diff touches `risk.yaml`, `risk/` or `execution/`. Jev's answers reach the decision function as floats and nothing else.
@@ -38,11 +39,11 @@ Inputs are limited to data that can be **rebuilt historically with exact timesta
 
 | Feature | Source | History available |
 |---|---|---|
-| Returns over 1h, 4h, 24h, 72h (in units of current volatility) | klines | yes |
-| Realised volatility, 24h and 7d, plus their ratio | klines | yes |
-| Trend: EMA slope on 4h and 1d, distance from EMA in ATRs, ADX | klines | yes |
-| Pullback depth (from swing high/low, in ATRs), RSI(14) on 1h | klines | yes |
-| Order flow: signed taker volume imbalance over 1h and 4h, trade-count z-score | Bybit public trade archive (`public.bybit.com/trading`) | yes, daily files |
+| Returns over 15m, 1h, 4h, 24h (in units of current volatility) | klines | yes |
+| Realised volatility, 4h and 3d, plus their ratio | klines | yes |
+| Trend: EMA slope on 1h and 4h, distance from EMA in ATRs, ADX | klines | yes |
+| Pullback depth (from swing high/low, in ATRs), RSI(14) on 15m | klines | yes |
+| Order flow: signed taker volume imbalance over 15m and 1h, trade-count z-score | Bybit public trade archive (`public.bybit.com/trading`) | yes, daily files |
 | Funding rate, hours to next funding | funding history API | yes |
 | Spread, top-10 book imbalance | live websocket only | **no** |
 
@@ -52,10 +53,10 @@ Leakage rule: every input has `available_at <= decision_time`. The candle that j
 
 ## 4. Strategy hypothesis: trend + pullback (to be backtested, not assumed)
 
-- **Trend filter:** 4h EMA(50) slope sign and 1d close relative to EMA(50) agree.
-- **Pullback entry (1h):** in an uptrend, price pulls back between 1 and 2.5 ATR(1h) from the 24h swing high and RSI(14) drops below a threshold. The mirror rule applies for shorts. A deterministic **candidate** flag is set only when this holds.
+- **Trend filter:** 1h EMA(50) slope sign and 4h close relative to EMA(50) agree.
+- **Pullback entry (15m):** in an uptrend, price pulls back between 1 and 2.5 ATR(15m) from the 6h swing high and RSI(14) drops below a threshold. The mirror rule applies for shorts. A deterministic **candidate** flag is set only when this holds.
 - **Jev filter:** on candidate candles, the questions in §5 have to clear the thresholds in `strategy.md`.
-- **Exit:** stop at entry minus k×ATR, take profit at R×stop distance, time stop after N hours, and an invalidation exit if the 4h trend flips.
+- **Exit:** stop at entry minus k×ATR, take profit at R×stop distance, time stop after N hours, and an invalidation exit if the 1h trend flips.
 - **Parameter grid is fixed in advance and kept small:** about 3×3×3×2 = 54 combinations. Every combination tried is counted as a trial (§9).
 
 Honest prior: trend strategies usually win 35–45% of trades. Entering on pullbacks pushes the win rate up, but **the hit rate above 55% and Sharpe above 1.5 gates together are a high bar. This hypothesis may well fail.** If it does, the harness says so, and nothing goes to paper trading.
@@ -70,7 +71,7 @@ setup_quality: score [0..4]             # rubric: clean pullback in trend ... br
 risk_state:  choice  {normal, elevated, extreme}
 ```
 
-Live: Jev is called on **every** closed 1h candle (for the dashboard and calibration data). Decisions only use candidate candles. Backtest: same calls on the same snapshots. A whole-history call costs a few dollars at the published $0.042 per 1M input tokens, and takes about an hour at the 1,200 requests/min limit.
+Live: Jev is called on **every** closed 15m candle (96 calls a day, about $0.002 a day), for the dashboard and calibration data. Decisions only use candidate candles. Backtest: Jev is called on every candidate candle plus a 10% random sample of the others, for calibration. The responses are cached by snapshot hash, so reruns are free and give the same result every time. Calling on all of 2021–2026 would be about 200k candles, about $4 and about 3 hours at 1,200 requests/min. Calling only on candidates is a fraction of that.
 
 No answer within 1.5 s, an error, or a malformed answer all mean **no trade**. It is never retried into a late entry.
 
@@ -136,7 +137,7 @@ To move paper → live, you need **all** of: ≥ 60 days and ≥ 50 trades on pa
 At 02:00 local time, a job sends Opus the day's decisions, fills, misses and calibration stats, labelled as data. Opus does root-cause analysis on each loss and writes **one new candidate rule per loss** (for example, "flatten before scheduled macro"), as an edit to `staging/strategy.md` and/or `staging/questions.yaml`. The harness then reruns the full backtest and gates. The candidate trial counts toward the deflated Sharpe, and the holdout is spent only once per candidate.
 
 - Fails → it's logged with the reason and nothing ships.
-- Passes → it's queued, and you get a Telegram `/promote <id>` request. **Proposed:** promotion needs your tap, and only one change per week can be promoted. That stops nightly overfitting to recent noise (§18).
+- Passes → it's queued, and you get a Telegram `/promote <id>` request. **Decided:** promotion needs your tap, and only one change per week can be promoted. That stops nightly overfitting to recent noise (§18).
 
 Opus runs through the Anthropic API using `claude-opus-5-5`, with tools limited to reading logs and writing to `staging/`.
 
@@ -166,10 +167,10 @@ Does paper match the backtest? Did the kill switch fire in testing? Is any hard 
 
 Already on that list: exchange outage while in a position, a gap through the stop, a Jev outage or model version change (we pin the model version and alert on change), testnet behaving differently from mainnet, too few out-of-sample trades, and the nightly loop overfitting.
 
-## 18. Questions you need to answer before I start the architecture
+## 18. Answers (all resolved)
 
-1. **Manual approval threshold:** is $2,500 notional OK?
-2. **Risk defaults in §8:** OK as written, especially the 10% live drawdown kill and the 2x leverage cap?
-3. **Promotion:** do nightly changes that pass the gates need your `/promote` tap and stay capped at one per week (my recommendation), or should they promote automatically?
-4. ~~**Keys:** TypeSafe key or a gateway?~~ **Answered: you have a TypeSafe key.** It goes in `.env` as `TYPESAFE_API_KEY`, never in chat.
-5. **Timeframe:** is 1h entries with a 4h/1d trend filter OK, or do you want 15m?
+1. Manual approval threshold: **$2,500 notional**, auto-deny after 5 min.
+2. Risk defaults in §8: **accepted as written.**
+3. Promotion: **your `/promote` tap, max one per week.**
+4. Keys: **your own TypeSafe key** in `.env` as `TYPESAFE_API_KEY`. It never goes in chat, code or logs.
+5. Timeframe: **15m entries, 1h/4h trend.** Note: cost drag per trade is about 4× higher than on 1h, so the cost-stress test (2× costs) matters more.
