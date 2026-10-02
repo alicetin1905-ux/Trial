@@ -12,6 +12,7 @@ dependencies = [
     "pyarrow>=16",
     "httpx>=0.27",
     "scipy>=1.13",
+    "typesafe-sdk>=0.7.2,<0.8",
 ]
 
 [project.optional-dependencies]

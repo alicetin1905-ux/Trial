@@ -1,0 +1,62 @@
+# Jev questions (spec §5). Each question isolates ONE factor. Code combines them with explicit
+# weights from strategy.md. Opus may propose edits to this file in staging/ only.
+#
+# The state Jev sees is {"legend": ..., "candidate_side": "long"|"short"|"none", "features": {...}}.
+# The feature names are listed in the legend below; the values come from state/snapshot.py.
+
+legend:
+  ret_15m_z / ret_1h_z / ret_4h_z / ret_24h_z: "log return over the window divided by recent volatility scaled to that window (a z-score)"
+  rv_4h_ann_pct / rv_3d_ann_pct: "realised volatility, annualised %, over 4 hours / 3 days"
+  rv_ratio_4h_3d: "short-term vol / longer-term vol; above 1 means volatility is expanding"
+  ema50_slope_1h_atr / ema50_slope_4h_atr: "change in the 50-period EMA over 3 bars, in units of ATR, on 1h / 4h bars"
+  dist_ema50_1h_atr / dist_ema50_4h_atr: "close minus 50-period EMA, in units of ATR, on 1h / 4h bars"
+  adx14_1h: "ADX(14) on 1h bars; above 25 means a strong trend"
+  pullback_6h_atr: "distance below the 6-hour high, in 15m ATRs"
+  bounce_6h_atr: "distance above the 6-hour low, in 15m ATRs"
+  rsi14_15m: "RSI(14) on 15m bars"
+  flow_imb_15m / flow_imb_1h: "(taker buy volume - taker sell volume) / total, over 15m / 1h; -1..1"
+  trade_count_z_15m: "number of trades in the last 15m vs the last 3 days, as a z-score"
+  hours_to_funding: "hours until the next perpetual funding settlement"
+
+questions:
+  regime:
+    type: choice
+    instructions: "Which market regime best describes the current state?"
+    criteria:
+      trending_up: "Persistent upward trend: higher-timeframe slopes and distances positive, trend strength meaningful"
+      trending_down: "Persistent downward trend: higher-timeframe slopes and distances negative, trend strength meaningful"
+      ranging: "No persistent direction: slopes near zero, weak trend strength, moderate volatility"
+      high_vol_chop: "Large two-way moves without direction: volatility expanding, trend strength weak"
+
+  direction:
+    type: choice
+    instructions: "Over the next 12 hours, which way is the price most likely to move, relative to current volatility?"
+    criteria:
+      up: "Up by more than about half a day's typical move"
+      down: "Down by more than about half a day's typical move"
+      flat: "Neither: stays within about half a day's typical move"
+
+  buy_pressure_real:
+    type: noul
+    instructions: "Is the taker buying pressure persistent across the 15m and 1h windows and backed by above-normal activity, rather than one isolated burst?"
+    criteria:
+      true: "Buying dominates on both windows and activity is not unusually low"
+      false: "Selling dominates, the windows disagree, or the imbalance is a one-off on thin activity"
+
+  setup_quality:
+    type: score
+    instructions: "Rate the quality of a pullback entry in the direction of candidate_side. If candidate_side is none, rate how close the state is to a clean pullback in the prevailing trend."
+    criteria:
+      - "Broken: the pullback has turned into a reversal, or the trend is absent"
+      - "Poor: trend weak or pullback too shallow or too deep"
+      - "Fair: trend present, pullback acceptable, some conflicting signals"
+      - "Good: clear trend, orderly pullback of 1 to 2.5 ATR, momentum reset"
+      - "Excellent: strong aligned trend on both timeframes, orderly pullback, momentum reset, order flow turning in the trend direction"
+
+  risk_state:
+    type: choice
+    instructions: "How dangerous is the market right now for holding a leveraged position for a few hours?"
+    criteria:
+      normal: "Volatility and activity within their usual ranges"
+      elevated: "Volatility or activity clearly above normal"
+      extreme: "Volatility expanding sharply, activity spiking: gap and liquidation-cascade risk"

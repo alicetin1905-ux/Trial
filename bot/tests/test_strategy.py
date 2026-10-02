@@ -150,3 +150,35 @@ def test_trend_flip_invalidates_position():
     assert trend_flipped(side=1, trend=-1)
     assert not trend_flipped(side=1, trend=0)  # neutral is not a flip
     assert not trend_flipped(side=-1, trend=-1)
+
+
+JEV_BLOCK = """jev:
+  min_p_regime: 0.5
+  min_p_direction: 0.4
+  min_pressure: 0.5
+  min_setup_quality: 2.0
+  max_p_risk_extreme: 0.2
+  w_regime: 1.0
+  w_direction: 1.0
+  w_pressure: 0.5
+  w_quality: 1.0
+  w_risk_normal: 0.5
+  intercept: -2.0
+  p_cutoff: 0.55
+"""
+
+
+def test_strategy_md_jev_section_is_optional_and_validated(tmp_path):
+    p = tmp_path / "strategy.md"
+    p.write_text(STRATEGY_MD)
+    assert load_strategy_md(p).jev is None
+    p.write_text(STRATEGY_MD.replace("---\n# Trend", JEV_BLOCK + "---\n# Trend"))
+    s = load_strategy_md(p)
+    assert s.jev is not None and s.jev.p_cutoff == 0.55
+    p.write_text(
+        STRATEGY_MD.replace(
+            "---\n# Trend", JEV_BLOCK.replace("p_cutoff: 0.55", "p_cutoff: 1.5") + "---\n# Trend"
+        )
+    )
+    with pytest.raises(ParamError, match="p_cutoff"):
+        load_strategy_md(p)

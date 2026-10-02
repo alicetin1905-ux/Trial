@@ -17,6 +17,8 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from jevbot.strategy.combine import JevParams
+
 
 class ParamError(ValueError):
     pass
@@ -50,11 +52,13 @@ class RuleParams(BaseModel):
 class StrategyFile(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     rules: RuleParams
+    jev: JevParams | None = None  # absent = rules only (the M4 baseline)
 
 
 @dataclass(frozen=True)
 class Strategy:
     rules: RuleParams
+    jev: JevParams | None
     body: str
     sha256: str
 
@@ -68,7 +72,9 @@ def load_strategy_md(path: Path) -> Strategy:
         parsed = StrategyFile.model_validate(yaml.safe_load(head))
     except ValidationError as e:
         raise ParamError(f"{path}: {e}") from None
-    return Strategy(rules=parsed.rules, body=body, sha256=hashlib.sha256(raw.encode()).hexdigest())
+    return Strategy(
+        rules=parsed.rules, jev=parsed.jev, body=body, sha256=hashlib.sha256(raw.encode()).hexdigest()
+    )
 
 
 # The search space is fixed BEFORE any backtest (spec §4) and every config tried counts as a trial.
