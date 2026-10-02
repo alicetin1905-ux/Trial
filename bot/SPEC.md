@@ -25,11 +25,11 @@ Non-goals for v1: more than one asset, more than one open position, leverage abo
 
 | Layer | Runs | Can do | Can never do |
 |---|---|---|---|
-| **Opus 5.5** (slow brain) | Nightly, offline | Read logs, propose edits to `strategy.md` and `questions.yaml`, write code in a branch, review | Grade its own output, touch `risk.yaml`, place orders, change anything that is live |
+| **Opus 5.5** (slow brain) | Weekly (Sun), offline | Read logs, propose edits to `strategy.md` and `questions.yaml`, write code in a branch, review | Grade its own output, touch `risk.yaml`, place orders, change anything that is live |
 | **Jev** (fast reflex) | Each closed 15m candle | Return calibrated probabilities for fixed typed questions about one snapshot | Return text, see anything except the snapshot, decide size, veto or order |
 | **Deterministic code** | Always | Own market state, thresholds, sizing, risk vetoes, orders, kill switch | Be changed at runtime by any model output |
 
-How this is enforced: the nightly loop can only write to `staging/`. A test fails the build if a candidate diff touches `risk.yaml`, `risk/` or `execution/`. Jev's answers reach the decision function as floats and nothing else.
+How this is enforced: the weekly loop can only write to `staging/`. A test fails the build if a candidate diff touches `risk.yaml`, `risk/` or `execution/`. Jev's answers reach the decision function as floats and nothing else.
 
 ## 3. State engine (the only thing Jev sees)
 
@@ -132,12 +132,14 @@ Bybit testnet has its own thin, synthetic order book, so testnet fills say nothi
 
 To move paper → live, you need **all** of: ≥ 60 days and ≥ 50 trades on paper; paper Sharpe, hit rate and average trade inside the backtest's 90% bootstrap band; slippage on our fills within 1.5× the modelled slippage; calibration passing on our own fills; the kill switch having fired once in testing; and every answer in §17 clean. Even then, the bot doesn't switch itself to live. That's a separate config flag that you flip.
 
-## 11. Nightly self-improvement (Opus 5.5)
+## 11. Weekly self-improvement (Opus 5.5)
 
-At 02:00 local time, a job sends Opus the day's decisions, fills, misses and calibration stats, labelled as data. Opus does root-cause analysis on each loss and writes **one new candidate rule per loss** (for example, "flatten before scheduled macro"), as an edit to `staging/strategy.md` and/or `staging/questions.yaml`. The harness then reruns the full backtest and gates. The candidate trial counts toward the deflated Sharpe, and the holdout is spent only once per candidate.
+Schedule (changed from nightly for cost): **Sunday 02:00 local time, and only if at least one trade closed that week.** A week with no trades means no Opus call and no cost. Spend is capped in code at **$5 a month**: each run gets at most `min($1.25, remaining monthly budget)`, and is metered from `usage` turn by turn. The run aborts when it would exceed that. When the month's budget is used up, there are no more runs until the 1st, and you get a Telegram alert. Prompt caching is on.
+
+The job sends Opus the week's decisions, fills, misses and calibration stats, labelled as data. Opus does root-cause analysis on each loss and writes **one new candidate rule per loss** (for example, "flatten before scheduled macro"), as an edit to `staging/strategy.md` and/or `staging/questions.yaml`. The harness then reruns the full backtest and gates. The candidate trial counts toward the deflated Sharpe, and the holdout is spent only once per candidate.
 
 - Fails → it's logged with the reason and nothing ships.
-- Passes → it's queued, and you get a Telegram `/promote <id>` request. **Decided:** promotion needs your tap, and only one change per week can be promoted. That stops nightly overfitting to recent noise (§18).
+- Passes → it's queued, and you get a Telegram `/promote <id>` request. **Decided:** promotion needs your tap, and only one change per week can be promoted. That stops overfitting to recent noise (§18).
 
 Opus runs through the Anthropic API using `claude-opus-5-5`, with tools limited to reading logs and writing to `staging/`.
 
@@ -147,7 +149,7 @@ A local FastAPI page with server-sent events. It shows each Jev call (question �
 
 ## 13. Telegram alerts (BotFather bot)
 
-Events: fill, order error, veto that blocked a candidate, manual-approval request, kill switch fired, process restart, stale data, nightly candidate passed or failed, and the daily report. Commands (your chat ID only): `/status`, `/kill`, `/approve <id>`, `/deny <id>`, `/promote <id>`.
+Events: fill, order error, veto that blocked a candidate, manual-approval request, kill switch fired, process restart, stale data, weekly candidate passed or failed, Opus monthly cap reached, and the daily report. Commands (your chat ID only): `/status`, `/kill`, `/approve <id>`, `/deny <id>`, `/promote <id>`, `/ackmodel`.
 
 ## 14. Daily report (00:05 UTC, Telegram + `reports/daily_YYYY-MM-DD.md`)
 
@@ -155,7 +157,7 @@ Trades, P&L, win rate, largest loss, average Jev latency and cost per decision, 
 
 ## 15. Deployment (Mac Mini)
 
-Python 3.12 in a venv. `launchd` agents for the bot (`KeepAlive`), the dashboard, and the nightly job (`StartCalendarInterval`). `pmset` set so the machine never sleeps. Logs rotate. If the process restarts, the bot rebuilds its position state from the exchange before it trades. I'll write a step-by-step walkthrough. This cloud session is temporary, so it can't host the bot itself.
+Python 3.12 in a venv. `launchd` agents for the bot (`KeepAlive`), the dashboard, and the weekly job (`StartCalendarInterval`). `pmset` set so the machine never sleeps. Logs rotate. If the process restarts, the bot rebuilds its position state from the exchange before it trades. I'll write a step-by-step walkthrough. This cloud session is temporary, so it can't host the bot itself.
 
 ## 16. Stack
 
@@ -165,7 +167,7 @@ Python 3.12, `pybit` (Bybit v5), `typesafe-sdk` (Jev), `anthropic`, pandas/numpy
 
 Does paper match the backtest? Did the kill switch fire in testing? Is any hard limit delegated to a model instead of code? Is Jev's confidence calibrated on our own fills? What market regime would break this? Then a section titled **"WHAT COULD BLOW UP THIS ACCOUNT?"** The bot refuses to go live until every answer is clean.
 
-Already on that list: exchange outage while in a position, a gap through the stop, a Jev outage or model version change (we pin the model version and alert on change), testnet behaving differently from mainnet, too few out-of-sample trades, and the nightly loop overfitting.
+Already on that list: exchange outage while in a position, a gap through the stop, a Jev outage or model version change (we pin the model version and alert on change), testnet behaving differently from mainnet, too few out-of-sample trades, and the weekly loop overfitting.
 
 ## 18. Answers (all resolved)
 

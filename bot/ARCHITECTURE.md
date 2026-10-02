@@ -7,7 +7,7 @@ Status: **DRAFT, needs your approval before the plan.** It implements the approv
 There is **one pure decision function**, `decide()`, and backtest, paper and live all call it. It takes a snapshot, Jev's answers, the strategy parameters, the calibrator and the account state, and returns an `Intent`, which can be "no trade". Nothing in `decide()` does I/O, reads a clock or talks to a model. Because backtest and live run the same code on the same snapshot, the only differences between them are data and fills, and both of those are measured (§7).
 
 ```
-            ┌───────── nightly (02:00, offline) ─────────┐
+            ┌────── weekly (Sun 02:00, offline) ──────────┐
             │  Opus 5.5 ──writes──▶ staging/             │
             │                 harness: backtest + gates  │
             │                 ──▶ queue ──/promote──▶ active/
@@ -34,7 +34,7 @@ every closed 15m candle            ▼
 | `jevbot-engine` | `KeepAlive` | Market data → snapshot → Jev → decide → guard → orders. The only process that **opens** positions. | yes |
 | `jevbot-ops` | `KeepAlive` | Polls Telegram (your chat ID only) and runs the **independent kill path**. Watchdog: if the engine's heartbeat is older than 2 minutes while a position is open, it alerts you, and after 10 minutes it kills. | close/cancel only |
 | `jevbot-dashboard` | `KeepAlive` | FastAPI + SSE, read-only on SQLite. Its kill button writes a `HALT` request that ops carries out. | no |
-| `jevbot-nightly` | `StartCalendarInterval` 02:00 | Opus improvement loop + backtest harness | no |
+| `jevbot-weekly` | `StartCalendarInterval` Sun 02:00 | Opus improvement loop + backtest harness. Skipped if no trades closed that week or the monthly cap is used up. | no |
 | `jevbot-report` | `StartCalendarInterval` 00:05 UTC | Daily report → Telegram + `reports/` | no |
 
 Why the kill path is a separate process: if the engine hangs, crashes or deadlocks, `/kill` still works. Killing is idempotent (cancel all orders, reduce-only close, write `HALTED`), so it's safe even if the engine and ops both trigger it at once. The engine checks `HALTED` before **every** order.
@@ -51,7 +51,7 @@ bot/
     risk.yaml            # hard limits. Loaded once into a frozen dataclass; its sha256 is journaled.
     settings.yaml        # symbol, timeframe, model pins, paths, mode (paper only, see §8)
   active/                # promoted strategy: strategy.md (+ YAML front-matter), questions.yaml, calibrator.json
-  staging/               # the ONLY directory the nightly Opus loop can write
+  staging/               # the ONLY directory the weekly Opus loop can write
   src/jevbot/
     config.py            # pydantic-settings; secrets as SecretStr; log redaction filter
     clock.py             # injectable clock (real / simulated) — nothing else calls time.time()
@@ -97,7 +97,7 @@ bot/
       walkforward.py     # anchored folds; holdout handled by gates.py only
       gates.py           # pass/fail + report; the ONLY place that touches the holdout
       trials.py          # append-only trials.jsonl
-    nightly/
+    improve/
       improve.py         # Opus loop (Tool Runner)
       tools.py           # the tools Opus gets (§6)
     golive.py            # final check -> GO_LIVE.md, exits non-zero unless all clean
@@ -120,7 +120,7 @@ bot/
 - **Backtest:** async with concurrency capped below 1,200 requests/min, retries on, and a response cache on disk. Reruns cost nothing and give identical results. A cache entry is only reused if the model name matches.
 - Each call is metered: latency, input tokens, cost. These feed the dashboard and the daily report.
 
-## 6. Nightly Opus loop (offline only)
+## 6. Weekly Opus loop (offline only)
 
 Python `anthropic` SDK, **Tool Runner**, `claude-opus-5-5`, adaptive thinking, `effort: "high"`, streaming. Server-side refusal fallback (`fallbacks: "default"`) is **turned on**, so a refusal falls back to another model instead of failing the run. Say if you want that off.
 
@@ -134,9 +134,9 @@ Tools Opus gets (and nothing else):
 | `write_candidate(strategy_md, questions_yaml, rationale, new_rules[])` | Validates the schema and writes `staging/<id>/`. **Rejected if it changes anything risk-related.** |
 | `run_walkforward(candidate_id)` | Harness runs the in-sample walk-forward and returns metrics. **No holdout numbers.** Counts as a trial. |
 
-Up to 3 candidates per night. After Opus finishes, `gates.py` evaluates the **final** candidate on the holdout once, including deflated Sharpe over every trial so far. Pass → queued, and Telegram `/promote <id>`, limited to one per week. Promotion copies `staging/<id>` → `active/` and records the git commit. **Rollback:** `jevbot promote --to <previous id>`. Every decision row records the hash of the strategy version that made it.
+Up to 3 candidates per run. After Opus finishes, `gates.py` evaluates the **final** candidate on the holdout once, including deflated Sharpe over every trial so far. Pass → queued, and Telegram `/promote <id>`, limited to one per week. Promotion copies `staging/<id>` → `active/` and records the git commit. **Rollback:** `jevbot promote --to <previous id>`. Every decision row records the hash of the strategy version that made it.
 
-Cost: Opus 5.5 is $4 per 1M input tokens and $20 per 1M output. **My estimate is roughly $1–3 a night.** The real number is measured from `usage` and shown in the daily report.
+**Cost control (you set the cap):** a **hard $5/month cap**, at most $1.25 per run. Spend is metered from each turn's `usage` at $4 per 1M input, $0.20 per 1M cached input and $20 per 1M output, and the loop aborts before going over. The system prompt and tools are cached, and runs are weekly and skipped when no trades closed. Expected cost is about $0–5 a month. Month-to-date spend appears in the daily report.
 
 ## 7. Paper mode (decided in spec §10)
 
@@ -160,7 +160,7 @@ Cost: Opus 5.5 is $4 per 1M input tokens and $20 per 1M output. **My estimate is
 - **Leakage tests:** see §4.
 - **Equivalence:** the backtest engine and the live engine produce identical intents when fed the same recorded candles and a fake Jev.
 - **Integration (needs keys, run manually or on the Mac Mini):** testnet order round-trip, attached SL/TP, the kill switch flattening a real testnet position, reconcile after a forced restart.
-- **Nightly guardrail test:** a candidate that edits `risk.yaml` or adds a risk-related key is rejected.
+- **Improvement-loop guardrail test:** a candidate that edits `risk.yaml` or adds a risk-related key is rejected.
 
 ## 11. What's deliberately simple in v1
 
