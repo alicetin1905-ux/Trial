@@ -1,6 +1,6 @@
-# Architecture (phase 2 of 6, awaiting approval)
+# Architecture (phase 2 of 6, approved)
 
-Status: **DRAFT, needs your approval before the plan.** It implements the approved `SPEC.md`.
+Status: **APPROVED 2026-10-02.** Next phase: plan. It implements the approved `SPEC.md`.
 
 ## 1. The one rule the whole design hangs on
 
