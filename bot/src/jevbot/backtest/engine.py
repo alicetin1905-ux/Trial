@@ -13,8 +13,10 @@ Costs: taker fee on both legs; slippage of base + k x ATR/price per side (agains
 fill, take profit included, because Bybit TP/SL trigger market orders); funding per settlement
 held in (entry, exit] using the conservative model (data.funding).
 
-`entry_filter(i, side) -> risk_pct` is the hook where M7 plugs in Jev + decide() + the risk
-guard. It returns the % of equity to risk; 0 means no trade.
+`entry_filter(i, side, state) -> risk_pct` is the hook where M7 plugs in Jev + decide() + the
+risk guard. `state` carries equity, peak equity and start-of-day equity (UTC), so the guard's
+daily-loss and drawdown rules apply in the backtest exactly as live. It returns the % of equity
+to risk; 0 means no trade.
 """
 
 from __future__ import annotations
@@ -31,7 +33,19 @@ from jevbot.strategy.rules import exit_levels
 
 BAR_MS = 15 * 60 * 1000
 
-EntryFilter = Callable[[int, int], float]
+DAY_MS = 24 * 3_600_000
+
+
+@dataclass(frozen=True)
+class EngineState:
+    equity: float
+    peak_equity: float
+    day_start_equity: float
+    now_ms: int  # decision time = close of bar i
+    close: float
+
+
+EntryFilter = Callable[[int, int, EngineState], float]
 
 
 @dataclass(frozen=True)
@@ -100,6 +114,9 @@ def run(
     pos: dict | None = None
     pending_entry: tuple[int, int, float] | None = None  # (side, signal_i, risk_pct)
     pending_exit: str | None = None
+    peak = equity0
+    day_start = equity0
+    day = int(ot[0]) // DAY_MS if n else 0
 
     def close_pos(px: float, t: int, reason: str) -> None:
         nonlocal pos, equity
@@ -124,6 +141,9 @@ def run(
         pos = None
 
     for i in range(n):
+        if int(ot[i]) // DAY_MS != day:  # first bar of a new UTC day
+            day = int(ot[i]) // DAY_MS
+            day_start = bar_equity[i - 1] if i > 0 else equity0
         if pos is not None and pending_exit is not None:
             slip = costs.slip(pos["atr"], o[i])
             close_pos(o[i] * (1 - pos["side"] * slip), int(ot[i]), pending_exit)
@@ -174,9 +194,11 @@ def run(
             0.0 if pos is None else pos["side"] * pos["units"] * (c[i] - pos["entry_px"]) - pos["entry_fee"]
         )
         bar_equity[i] = equity + unreal
+        peak = max(peak, bar_equity[i])
 
         if pos is None and pending_entry is None and signal[i] != 0 and contiguous_next[i] and atr[i] > 0:
-            rp = risk_pct if entry_filter is None else entry_filter(i, int(signal[i]))
+            st = EngineState(equity, peak, day_start, int(ot[i]) + BAR_MS, float(c[i]))
+            rp = risk_pct if entry_filter is None else entry_filter(i, int(signal[i]), st)
             if rp > 0:
                 pending_entry = (int(signal[i]), i, rp)
 

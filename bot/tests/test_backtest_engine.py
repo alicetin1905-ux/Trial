@@ -135,8 +135,8 @@ def test_no_entry_into_a_gap():
 
 def test_entry_filter_can_veto_and_set_risk():
     b = _bars([FLAT] * 8)
-    assert _run(b, entry_filter=lambda i, side: 0.0).trades.empty
-    half = _run(b, entry_filter=lambda i, side: 0.5).trades.iloc[0]
+    assert _run(b, entry_filter=lambda i, side, st: 0.0).trades.empty
+    half = _run(b, entry_filter=lambda i, side, st: 0.5).trades.iloc[0]
     assert half.units == pytest.approx(50.0)
 
 
@@ -145,3 +145,21 @@ def test_mark_to_market_equity_and_daily_rows():
     assert len(r.bar_equity) == 7
     assert r.bar_equity[2] == pytest.approx(10_000 - 100 * 0.2)
     assert list(r.daily.columns) == ["day", "equity_close", "equity_min"]
+
+
+def test_entry_filter_sees_equity_peak_and_day_start():
+    seen = []
+
+    def spy(i, side, st):
+        seen.append(st)
+        return 1.0
+
+    # trade 1 loses at the stop in bar 2; a second signal at bar 4 sees the lower equity
+    b = _bars([FLAT, FLAT, (100.0, 100.4, 98.5, 99.0), FLAT, FLAT, FLAT, FLAT, FLAT])
+    sig = np.zeros(len(b), dtype=int)
+    sig[0] = sig[4] = 1
+    run(b, sig, np.full(len(b), 1.0), np.ones(len(b)), RULES, NO_COST, equity0=10_000.0, entry_filter=spy)
+    assert seen[0].equity == 10_000.0 and seen[0].peak_equity == 10_000.0
+    assert seen[1].equity == pytest.approx(9_900.0)
+    assert seen[1].peak_equity == 10_000.0 and seen[1].day_start_equity == 10_000.0
+    assert seen[1].now_ms == b.available_at[4] and seen[1].close == 100.0
